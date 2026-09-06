@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Piece Rarity Binder — Straw Hat Chase Tracker</title>
+<meta name="theme-color" content="#0a0505">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0505;
+  --bg-panel: #150a0a;
+  --bg-card: #1c0e0e;
+  --bg-card-hover: #240f0f;
+  --border: #3a1414;
+  --border-bright: #7a1f1f;
+  --red: #d81e1e;
+  --red-bright: #ff3b3b;
+  --red-dim: #8f1414;
+  --black-ink: #050202;
+  --text: #f2e6e6;
+  --text-dim: #b98f8f;
+  --text-faint: #7a5c5c;
+  --gold: #e0b84a;
+  --green: #3fae5c;
+  --blue: #3f8ae0;
+  --purple: #a05ae0;
+  --shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at top, #1a0808 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: 'Manrope', sans-serif;
+  min-height: 100vh;
+  padding-bottom: 60px;
+}
+
+.hero {
+  background: linear-gradient(180deg, var(--black-ink) 0%, var(--bg-panel) 100%);
+  border-bottom: 3px solid var(--red);
+  box-shadow: 0 4px 30px rgba(216,30,30,0.25);
+  padding: 20px 16px 16px;
+}
+.hero-inner { max-width: 1100px; margin: 0 auto; }
+
+.title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.title-row h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  letter-spacing: 1.5px;
+  margin: 0;
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(216,30,30,0.55);
+}
+.title-row h1 span { color: var(--red-bright); }
+.subtitle { color: var(--text-dim); font-size: 13px; }
+
+.stats-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-width: 96px;
+  text-align: center;
+}
+.stat .n { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--red-bright); }
+.stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-faint); margin-top: 2px; }
+.stat.value .n { color: var(--gold); }
+
+.toolbar {
+  max-width: 1100px;
+  margin: 18px auto 0;
+  padding: 0 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.search-wrap { flex: 1 1 240px; position: relative; }
+#search {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+#search:focus { outline: none; border-color: var(--red); }
+#search::placeholder { color: var(--text-faint); }
+
+select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+select:focus { outline: none; border-color: var(--red); }
+
+.chip-row {
+  max-width: 1100px;
+  margin: 12px auto 0;
+  padding: 0 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.color-chip {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.color-chip.active { border-color: var(--red); color: var(--text); background: var(--bg-card-hover); box-shadow: 0 0 0 1px var(--red) inset; }
+.color-chip[data-color="Red"].active { border-color: var(--red-bright); }
+.color-chip[data-color="Green"].active { border-color: var(--green); }
+.color-chip[data-color="Blue"].active { border-color: var(--blue); }
+.color-chip[data-color="Purple"].active { border-color: var(--purple); }
+
+.grid {
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-bright);
+  box-shadow: var(--shadow);
+}
+.card.chase { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset, 0 0 16px rgba(224,184,74,0.25); }
+.card.owned::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  background: var(--green);
+  color: #06210f;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.card-img-wrap {
+  aspect-ratio: 5 / 7;
+  background: linear-gradient(160deg, #1c0e0e, #120707);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.card-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card-img-wrap .fallback { font-size: 11px; color: var(--text-faint); text-align: center; padding: 10px; }
+
+.rarity-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 6px;
+  z-index: 2;
+  letter-spacing: 0.4px;
+}
+.rarity-L { background: var(--red); color: #fff; }
+.rarity-C { background: #333; color: #ccc; }
+.rarity-UC { background: #4a4a4a; color: #eee; }
+.rarity-R { background: var(--blue); color: #fff; }
+.rarity-SR { background: var(--purple); color: #fff; }
+.rarity-SEC { background: var(--gold); color: #2a1a00; }
+.rarity-TR { background: linear-gradient(135deg, var(--red-bright), #7a1f1f); color: #fff; }
+.rarity-SP { background: linear-gradient(135deg, var(--gold), #b5862a); color: #2a1a00; }
+.rarity-P { background: var(--green); color: #06210f; }
+
+.parallel-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(224,184,74,0.9);
+  color: #2a1a00;
+  z-index: 2;
+  letter-spacing: 0.3px;
+}
+
+.card-info { padding: 8px 10px 10px; }
+.card-name { font-size: 12.5px; font-weight: 700; line-height: 1.25; margin-bottom: 4px; min-height: 30px; }
+.card-meta { font-size: 10.5px; color: var(--text-faint); margin-bottom: 6px; }
+.card-price { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--gold); letter-spacing: 0.5px; }
+.card-price.na { color: var(--text-faint); font-size: 13px; font-family: inherit; }
+
+.empty-state {
+  max-width: 1100px;
+  margin: 60px auto;
+  text-align: center;
+  color: var(--text-faint);
+  padding: 0 20px;
+}
+.empty-state h2 { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--text-dim); letter-spacing: 1px; }
+.empty-state code {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--red-bright);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(5,2,2,0.85);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 16px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(216,30,30,0.2);
+}
+@media (max-width: 560px) { .modal { flex-direction: column; } }
+.modal-img-col { flex: 0 0 220px; padding: 18px; display: flex; align-items: flex-start; justify-content: center; }
+.modal-img-col img { width: 100%; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.modal-body { flex: 1; padding: 18px 20px 20px 6px; }
+.modal-close {
+  position: absolute; top: 10px; right: 14px;
+  background: none; border: none; color: var(--text-dim);
+  font-size: 22px; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--red-bright); }
+.modal h2 { font-family: 'Bebas Neue', sans-serif; font-size: 26px; margin: 0 0 4px; letter-spacing: 0.5px; }
+.modal .meta-line { color: var(--text-dim); font-size: 12.5px; margin-bottom: 10px; }
+.modal .stat-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin: 12px 0;
+}
+.modal .stat-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px; text-align: center;
+}
+.modal .stat-box .v { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--red-bright); }
+.modal .stat-box .k { font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; }
+.modal .card-text {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; font-size: 12.5px;
+  line-height: 1.5; color: var(--text-dim); margin: 12px 0;
+}
+.modal .price-row { display: flex; gap: 14px; align-items: baseline; margin: 14px 0; }
+.modal .price-row .big { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); }
+.modal .price-row .small { font-size: 12px; color: var(--text-faint); }
+.own-toggle {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.own-toggle.owned { background: var(--green); color: #06210f; border-color: var(--green); }
+.own-toggle:hover { background: var(--bg-card-hover); }
+
+footer.credit {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 30px;
+  padding: 0 20px;
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="title-row">
+      <h1>ONE PIECE <span>RARITY BINDER</span></h1>
+      <span class="subtitle">Straw Hat chase tracker — English sets</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="n" id="statCards">—</div><div class="l">Total Cards</div></div>
+      <div class="stat"><div class="n" id="statOwned" style="color:#3fae5c;">0</div><div class="l">Owned</div></div>
+      <div class="stat value"><div class="n" id="statValue">$0.00</div><div class="l">Value</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <input id="search" type="text" placeholder="Search cards, sets, sub-types…">
+  </div>
+  <select id="setFilter"><option value="">All Sets</option></select>
+  <select id="rarityFilter"><option value="">All Rarities</option></select>
+  <select id="typeFilter"><option value="">All Types</option></select>
+  <select id="sortBy">
+    <option value="price-desc">Price: High to Low</option>
+    <option value="price-asc">Price: Low to High</option>
+    <option value="name-asc">Name A–Z</option>
+    <option value="set-asc">Set Order</option>
+  </select>
+</div>
+
+<div class="chip-row" id="colorChips"></div>
+
+<div id="gridContainer"></div>
+
+<footer class="credit">Data via optcgapi.com (free, English release only) — set up 2026-09-06.</footer>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const CSV_PATH = 'ONE_PIECE_COLLECTION.csv';
+let allCards = [];
+let ownedSet = new Set();
+let activeColors = new Set();
+
+const RARITY_ORDER = { L: 0, C: 1, UC: 2, R: 3, SR: 4, SEC: 5, TR: 6, SP: 7, P: 8 };
+const COLORS = ['Red', 'Green', 'Blue', 'Purple', 'Black', 'Yellow'];
+
+function loadOwned() {
+  try {
+    const raw = localStorage.getItem('onepiece-owned');
+    if (raw) ownedSet = new Set(JSON.parse(raw));
+  } catch (e) { /* ignore */ }
+}
+function saveOwned() {
+  try { localStorage.setItem('onepiece-owned', JSON.stringify([...ownedSet])); } catch (e) { /* ignore */ }
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let i = 0, field = '', row = [], inQuotes = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    } else {
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ',') { row.push(field); field = ''; i++; continue; }
+      if (c === '\r') { i++; continue; }
+      if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++; continue;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows[0];
+  return rows.slice(1).filter(r => r.length > 1 || r[0] !== '').map(r => {
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+    return obj;
+  });
+}
+
+function fmtPrice(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return null;
+  return n;
+}
+
+// Special Rare (SP) cards aren't a distinct rarity code from the API --
+// they come back as their underlying rarity (almost always SR) with
+// "(SP)" appended to the card name. Same detection rule as
+// is_chase.py's SPECIAL_RARE_NAME_MARKERS on the Python side, kept in
+// sync so the UI's "SP" badge matches what the collector actually
+// treated as Special Rare.
+function isSpecialRare(card) {
+  return (card['Card Name'] || '').includes('(SP)');
+}
+
+function displayRarity(card) {
+  return isSpecialRare(card) ? 'SP' : card.Rarity;
+}
+
+// Purely cosmetic here (the gold chase-glow border) -- every row in the
+// CSV is already chase-tier by the time it reaches this page, since
+// ONE_PIECE_COLLECTOR.py's is_chase.py filter drops bulk cards before
+// writing. Mirrors that same Python rule (config.py's
+// CHASE_ONLY_IF_PARALLEL_RARITIES) so if a manually-edited CSV ever
+// slips in a plain Leader/Rare row, the UI doesn't visually treat it as
+// equally chase-worthy as a genuine SR/SEC/TR/SP/parallel pull.
+function cardIsChase(card) {
+  if (isSpecialRare(card)) return true;
+  if (['SR', 'SEC', 'TR', 'P'].includes(card.Rarity)) return true;
+  if (['L', 'R'].includes(card.Rarity) && card['Is Parallel'] === 'Yes') return true;
+  return false;
+}
+
+function populateFilters(cards) {
+  const setSel = document.getElementById('setFilter');
+  const raritySel = document.getElementById('rarityFilter');
+  const typeSel = document.getElementById('typeFilter');
+  const sets = [...new Set(cards.map(c => c['Set Name']).filter(Boolean))];
+  const rarities = [...new Set(cards.map(c => c.Rarity).filter(Boolean))].sort((a, b) => (RARITY_ORDER[a] ?? 99) - (RARITY_ORDER[b] ?? 99));
+  const types = [...new Set(cards.map(c => c.Type).filter(Boolean))];
+  sets.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; setSel.appendChild(o); });
+  rarities.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; raritySel.appendChild(o); });
+  types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; typeSel.appendChild(o); });
+
+  const chipRow = document.getElementById('colorChips');
+  const presentColors = COLORS.filter(c => cards.some(card => (card.Color || '').includes(c)));
+  presentColors.forEach(color => {
+    const chip = document.createElement('button');
+    chip.className = 'color-chip';
+    chip.dataset.color = color;
+    chip.textContent = color;
+    chip.onclick = () => {
+      if (activeColors.has(color)) { activeColors.delete(color); chip.classList.remove('active'); }
+      else { activeColors.add(color); chip.classList.add('active'); }
+      render();
+    };
+    chipRow.appendChild(chip);
+  });
+}
+
+function updateStats(visibleCards) {
+  document.getElementById('statCards').textContent = allCards.length;
+  document.getElementById('statOwned').textContent = ownedSet.size;
+  let total = 0;
+  allCards.forEach(c => {
+    if (ownedSet.has(c['Card ID'])) {
+      const p = fmtPrice(c['Market Price']);
+      if (p !== null) total += p;
+    }
+  });
+  document.getElementById('statValue').textContent = '$' + total.toFixed(2);
+}
+
+function cardEl(card) {
+  const div = document.createElement('div');
+  const chase = cardIsChase(card);
+  const owned = ownedSet.has(card['Card ID']);
+  div.className = 'card' + (chase ? ' chase' : '') + (owned ? ' owned' : '');
+  div.onclick = () => openModal(card);
+
+  const price = fmtPrice(card['Market Price']);
+  const priceHtml = price !== null
+    ? `$${price.toFixed(2)}`
+    : `<span class="card-price na">N/A</span>`;
+
+  div.innerHTML = `
+    <div class="rarity-badge rarity-${displayRarity(card)}">${displayRarity(card)}</div>
+    ${card['Is Parallel'] === 'Yes' ? '<div class="parallel-badge">PARALLEL</div>' : ''}
+    <div class="card-img-wrap">
+      ${card['Image URL'] ? `<img src="${card['Image URL']}" loading="lazy" alt="${card['Card Name']}" onerror="this.parentElement.innerHTML='<div class=&quot;fallback&quot;>${card['Card Name']}</div>'">` : `<div class="fallback">${card['Card Name']}</div>`}
+    </div>
+    <div class="card-info">
+      <div class="card-name">${card['Card Name']}</div>
+      <div class="card-meta">${card['Card ID']} · ${card['Set Name']}</div>
+      <div class="card-price${price === null ? ' na' : ''}">${price !== null ? '$' + price.toFixed(2) : 'N/A'}</div>
+    </div>
+  `;
+  return div;
+}
+
+function openModal(card) {
+  const modal = document.getElementById('modal');
+  const owned = ownedSet.has(card['Card ID']);
+  const price = fmtPrice(card['Market Price']);
+  const inv = fmtPrice(card['Inventory Price']);
+  modal.innerHTML = `
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div class="modal-img-col">
+      ${card['Image URL'] ? `<img src="${card['Image URL']}" alt="${card['Card Name']}">` : ''}
+    </div>
+    <div class="modal-body">
+      <h2>${card['Card Name']}</h2>
+      <div class="meta-line">${card['Card ID']} · ${card['Set Name']} (${card['Set ID']}) · ${card.Color} ${card.Type}${card['Is Parallel'] === 'Yes' ? ' · Parallel' : ''}</div>
+      <div class="stat-grid">
+        ${card.Cost ? `<div class="stat-box"><div class="v">${card.Cost}</div><div class="k">Cost</div></div>` : ''}
+        ${card.Power ? `<div class="stat-box"><div class="v">${card.Power}</div><div class="k">Power</div></div>` : ''}
+        ${card.Life ? `<div class="stat-box"><div class="v">${card.Life}</div><div class="k">Life</div></div>` : ''}
+        ${card.Counter ? `<div class="stat-box"><div class="v">${card.Counter}</div><div class="k">Counter</div></div>` : ''}
+        ${card.Attribute ? `<div class="stat-box"><div class="v">${card.Attribute}</div><div class="k">Attribute</div></div>` : ''}
+        <div class="stat-box"><div class="v">${displayRarity(card)}</div><div class="k">Rarity</div></div>
+      </div>
+      ${card['Card Text'] ? `<div class="card-text">${card['Card Text']}</div>` : ''}
+      <div class="price-row">
+        <div><div class="big">${price !== null ? '$' + price.toFixed(2) : 'N/A'}</div><div class="small">Market</div></div>
+        <div><div class="big" style="color:var(--text-dim);font-size:20px;">${inv !== null ? '$' + inv.toFixed(2) : 'N/A'}</div><div class="small">Inventory</div></div>
+      </div>
+      <button class="own-toggle ${owned ? 'owned' : ''}" id="ownBtn">${owned ? '✓ Owned' : 'Mark as Owned'}</button>
+    </div>
+  `;
+  document.getElementById('ownBtn').onclick = () => {
+    if (ownedSet.has(card['Card ID'])) ownedSet.delete(card['Card ID']);
+    else ownedSet.add(card['Card ID']);
+    saveOwned();
+    openModal(card);
+    render();
+  };
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+function render() {
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  const setF = document.getElementById('setFilter').value;
+  const rarityF = document.getElementById('rarityFilter').value;
+  const typeF = document.getElementById('typeFilter').value;
+  const sortBy = document.getElementById('sortBy').value;
+
+  let filtered = allCards.filter(c => {
+    if (search) {
+      const hay = (c['Card Name'] + ' ' + c['Set Name'] + ' ' + c['Sub Types']).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    if (setF && c['Set Name'] !== setF) return false;
+    if (rarityF && c.Rarity !== rarityF) return false;
+    if (typeF && c.Type !== typeF) return false;
+    if (activeColors.size && ![...activeColors].some(col => (c.Color || '').includes(col))) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sortBy === 'price-desc') return (fmtPrice(b['Market Price']) ?? -1) - (fmtPrice(a['Market Price']) ?? -1);
+    if (sortBy === 'price-asc') return (fmtPrice(a['Market Price']) ?? 1e9) - (fmtPrice(b['Market Price']) ?? 1e9);
+    if (sortBy === 'name-asc') return a['Card Name'].localeCompare(b['Card Name']);
+    if (sortBy === 'set-asc') return (a['Card ID'] || '').localeCompare(b['Card ID'] || '');
+    return 0;
+  });
+
+  const container = document.getElementById('gridContainer');
+  container.innerHTML = '';
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state"><h2>No cards match</h2><p>Try clearing filters or search.</p></div>`;
+  } else {
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    filtered.forEach(c => grid.appendChild(cardEl(c)));
+    container.appendChild(grid);
+  }
+  updateStats(filtered);
+}
+
+async function init() {
+  loadOwned();
+  try {
+    const resp = await fetch(CSV_PATH);
+    if (!resp.ok) throw new Error('CSV not found');
+    const text = await resp.text();
+    allCards = parseCSV(text);
+  } catch (e) {
+    document.getElementById('gridContainer').innerHTML = `
+      <div class="empty-state">
+        <h2>No collection data yet</h2>
+        <p>Run <code>python ONE_PIECE_COLLECTOR.py</code> in this folder, then reload this page.</p>
+      </div>`;
+    document.getElementById('statCards').textContent = '0';
+    return;
+  }
+  populateFilters(allCards);
+  ['search'].forEach(id => document.getElementById(id).addEventListener('input', render));
+  ['setFilter', 'rarityFilter', 'typeFilter', 'sortBy'].forEach(id => document.getElementById(id).addEventListener('change', render));
+  render();
+}
+
+init();
+</script>
+
+</body>
+</html>
