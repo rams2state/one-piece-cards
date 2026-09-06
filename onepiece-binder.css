@@ -1,0 +1,924 @@
+  :root{
+    --ink:#0d0708;
+    --panel:#1a1012;
+    --panel2:#241416;
+    --line:#3a1c1f;
+    --text:#f1e9df;
+    --dim:#a3898c;
+    /* "gold" vars keep their original names for easy mirroring against the
+       Pokémon codebase, but now hold the app's RED accent (buttons, borders,
+       active states, highlights) per Jordan's red/black theme request. */
+    --gold:#e63946;
+    --gold-bright:#ff5a5f;
+    /* Real gold — reserved for price numbers specifically (Jordan: "gold for
+       price numbers"), so prices read as currency, not as another red accent. */
+    --price-gold:#e8b914;
+    --price-gold-bright:#ffd75e;
+    --foil:#e63946;
+    --sir:#ff8fd6;
+    --mar:#ff9d5c;
+    --mhr:#7c9bff;
+    --green:#4ade80;
+  }
+  *{box-sizing:border-box;}
+  /* FEATURE (2026-08-13): blocks the browser's native edge-swipe-back
+     gesture (iOS Safari/Chrome) from firing on the same left-edge swipe
+     this app's own touch handler listens for (see the swipe-right IIFE in
+     app.js, EDGE_MAX:40). Without this, a swipe near the left edge could
+     trigger a full native page-history navigation INSTEAD OF (or racing
+     against) the in-app popstate handler that carefully restores set-detail
+     exit state (scroll position, active filters/search/sort) — the native
+     gesture bypasses all of that, which is what caused filters to appear to
+     "reset" and the page to jump to the top on swipe-back in set view. */
+  html,body{margin:0;padding:0;overscroll-behavior-x:none;}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:'Manrope', sans-serif;
+    font-size:18px;
+    min-height:100vh;
+    /* Belt-and-suspenders alongside overscroll-behavior-x above — some iOS
+       Safari versions still honor the native edge-swipe-back gesture unless
+       touch-action explicitly restricts horizontal panning at the edge.
+       pan-y still allows normal vertical scrolling everywhere. */
+    touch-action:pan-y;
+  }
+  .display{font-family:'Luckiest Guy','Bebas Neue',sans-serif;letter-spacing:0.01em;}
+
+  /* HEADER */
+  header.hero{
+    padding:20px 28px 20px;
+    border-bottom:1px solid var(--line);
+    position:relative; overflow:hidden;
+  }
+  header.hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(115deg,transparent 0 38px,rgba(212,175,55,0.035) 38px 40px);
+    pointer-events:none;
+  }
+  .hero-inner{max-width:1280px;margin:0 auto;position:relative;z-index:1;}
+  .eyebrow{display:none;}
+  h1.display{font-size:44px;margin:0 0 6px;color:var(--text);line-height:0.95;}
+  h1.display span{color:var(--gold-bright);}
+  .sub{color:var(--dim);font-size:15px;max-width:640px;line-height:1.5;}
+  .stats-row{display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:110px;}
+  .stat .n{font-family:'Luckiest Guy','Bebas Neue';font-size:26px;color:var(--price-gold-bright);line-height:1;}
+  .stat .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:0.08em;margin-top:3px;}
+  .stat-owned{border-color:var(--green);cursor:pointer;transition:background .15s,transform .15s;user-select:none;}
+  .stat-owned:hover{background:#4ade8015;transform:translateY(-1px);}
+  .stat-owned.active{background:#4ade8022;border-color:#4ade80;box-shadow:0 0 0 1px #4ade8060;}
+  .stat-owned.active .l::after{content:' ✓';}
+
+  /* AUTH BUTTON */
+  /* Sign-in + Share sit together in a normal-flow flex row, right-aligned,
+     above the stats row — NOT position:absolute. Absolute positioning kept
+     causing this row to visually collide with the stats row on mobile any
+     time either row's height changed (removing the h1, stacking the
+     buttons, etc.), since the two were positioned independently with no
+     relationship to each other. Normal flow means the browser handles
+     spacing between them automatically, and they naturally stay side by
+     side (wrapping only if truly out of room) at any width. */
+  .header-btn-row {
+    display:flex; gap:10px; align-items:center; justify-content:flex-end;
+    flex-wrap:wrap;
+  }
+  .auth-btn {
+    background:var(--panel); border:1px solid var(--line); color:var(--dim);
+    padding:8px 14px; border-radius:8px; font-size:13px; font-family:inherit;
+    cursor:pointer; transition:border-color .15s, color .15s;
+    white-space:nowrap;
+  }
+  .auth-btn:hover { border-color:var(--gold); color:var(--text); }
+  .auth-btn.signed-in { border-color:#4ade80; color:#4ade80; }
+  .share-btn.copied { border-color:var(--gold); color:var(--gold-bright); }
+  /* FEATURE (2026-08-02): version tag — pushed to the far left of the header
+     button row (margin-right:auto against the row's flex-end buttons), same
+     line as Share/Sign-in. See APP_VERSION in rarity-binder.js. Bumped only
+     when explicitly asked to "bump the version number", so it's always
+     obvious whether a push landed without needing to hard-refresh to compare. */
+  .app-version {
+    font-size:11px; color:var(--dim); font-family:inherit;
+    letter-spacing:0.02em; white-space:nowrap; opacity:0.7;
+    margin-right:auto;
+  }
+  .read-only-banner {
+    display:inline-block; position:static;
+    background:rgba(250,204,21,.12); border:1px solid var(--gold);
+    color:var(--gold-bright); padding:8px 14px; border-radius:8px;
+    font-size:13px;
+  }
+  /* FEATURE (2026-08-02): version tag placed just left of the read-only
+     banner pill (second copy — the header-row one is hidden along with the
+     rest of headerBtnRow in this view). See applyReadOnlyShareUI in
+     rarity-binder.js, which fills in #appVersionReadOnly's text. */
+  .read-only-row {
+    display:flex; align-items:center; gap:8px; margin:10px 0 0;
+  }
+  .app-version-readonly { margin-right:0; }
+  @media (max-width:600px) {
+    .header-btn-row { gap:6px; }
+    .auth-btn { padding:6px 10px; font-size:12px; }
+    .read-only-banner { margin-bottom:8px; font-size:11px; padding:6px 10px; }
+  }
+
+  /* TOOLBAR */
+  .toolbar{max-width:1280px;margin:22px auto 0;padding:0 28px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .search-wrap{position:relative;flex:1;min-width:220px;}
+  input#search{
+    width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:11px 36px 11px 14px;border-radius:8px;font-size:16px;font-family:inherit;
+  }
+  input#search:focus{outline:none;border-color:var(--gold);}
+  #clearSearch{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    width:22px;height:22px;border:none;border-radius:50%;cursor:pointer;
+    background:transparent;color:var(--dim);font-size:16px;line-height:1;
+    display:none;align-items:center;justify-content:center;
+  }
+  #clearSearch:hover{background:var(--line);color:var(--text);}
+  .search-wrap.has-text #clearSearch{display:flex;}
+  select{
+    background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:11px 12px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;
+  }
+  select:focus{outline:none;border-color:var(--gold);}
+
+  /* RESET BUTTON */
+  .reset-btn{
+    background:transparent;border:1px solid var(--line);color:var(--dim);
+    padding:10px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;
+    transition:all .15s;white-space:nowrap;
+  }
+  .reset-btn:hover{border-color:#f87171;color:#f87171;}
+  .reset-btn.prominent{
+    border-color:#f87171;color:#f87171;background:#f8717112;
+    font-size:14px;padding:13px 18px;font-weight:700;
+  }
+
+  /* VIEW TOGGLE */
+  .view-toggle{display:flex;gap:6px;}
+  .vbtn{
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;
+    transition:all .15s;
+  }
+  .vbtn.active{background:var(--gold);color:#231a00;border-color:var(--gold);font-weight:700;}
+
+  /* QUICK ACTION ROW (mobile only — hidden on desktop) */
+  .quick-row{display:none;}
+
+  /* MAIN */
+  main{max-width:1280px;margin:0 auto;padding:26px 28px 80px;}
+
+  /* LOADING */
+  #loadingState{text-align:center;padding:80px 20px;color:var(--dim);}
+  #loadingState .spinner{
+    width:40px;height:40px;border:3px solid var(--line);border-top-color:var(--gold);
+    border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #loadingState p{font-size:15px;}
+
+  /* NO-CSV STATE */
+  #noDataState{display:none;text-align:center;padding:60px 20px;}
+  #noDataState .display{font-size:28px;color:var(--text);margin-bottom:12px;}
+  #noDataState p{color:var(--dim);font-size:14px;line-height:1.6;max-width:520px;margin:0 auto 24px;}
+  .upload-zone{
+    border:2px dashed var(--line);border-radius:14px;padding:32px;max-width:480px;
+    margin:0 auto;cursor:pointer;transition:border-color .15s;
+  }
+  .upload-zone:hover{border-color:var(--gold);}
+  .upload-zone input{display:none;}
+  .upload-zone label{cursor:pointer;display:block;}
+  .upload-btn{
+    display:inline-block;margin-top:12px;padding:12px 24px;background:var(--gold);
+    color:#231a00;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;
+  }
+
+  /* ── ERA SECTION (set overview) ─────────────────────────────────── */
+  .era-section{margin-bottom:48px;}
+  .era-header{
+    display:flex;align-items:center;gap:12px;
+    border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:18px;
+  }
+  .era-title{font-family:'Luckiest Guy','Bebas Neue';font-size:22px;color:var(--foil);letter-spacing:0.04em;text-transform:uppercase;}
+  .era-count{font-size:12px;color:var(--dim);font-weight:600;}
+
+  /* ── SET OVERVIEW GRID ───────────────────────────────────────────── */
+  .set-overview-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+    gap:16px;
+  }
+
+  /* SET OVERVIEW CARD — matches screenshot style */
+  .set-ov-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px 16px;cursor:pointer;
+    transition:border-color .2s,box-shadow .2s,transform .15s;
+    position:relative;
+  }
+  .set-ov-card:hover{border-color:var(--gold);box-shadow:0 8px 28px rgba(0,0,0,0.4);transform:translateY(-2px);}
+
+  /* top row: code badge + logo + year */
+  .set-ov-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:8px;}
+  .set-ov-left{display:flex;align-items:center;gap:12px;min-width:0;overflow:hidden;}
+  /* Light "chip" behind set symbol icons — symbols are drawn dark-on-transparent
+     for light backgrounds, so rather than inverting/distorting their colors,
+     give them a small light patch of their own to sit on. */
+  .symbol-chip{
+    display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:52px;height:52px;border-radius:12px;
+    background:rgba(255,255,255,0.92);
+  }
+  .symbol-chip-lg{width:52px;height:52px;border-radius:12px;}
+  .set-ov-symbol{
+    width:36px;height:36px;object-fit:contain;
+  }
+  .set-ov-code{
+    background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+    font-size:9px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--dim);padding:3px 6px;
+  }
+  .set-ov-year{font-size:13px;color:var(--dim);font-weight:700;}
+
+  /* Japanese set symbol on the overview card — takes the place of the old
+     English wordmark logo, sized to sit alongside the English symbol chip
+     (52px) rather than dominate it. Some English sets map to 2-3 JP sets,
+     so multiple icons render side by side at this smaller size. */
+  .jp-ov-logo-wrap{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+  .jp-ov-logo{
+    height:44px;width:auto;max-width:56px;object-fit:contain;
+    background:rgba(255,255,255,0.92);border-radius:8px;padding:4px;
+  }
+
+  /* Japanese set symbol badges — small icons shown in the set detail header
+     alongside the English symbol chip, one per equivalent JP set. */
+  .jp-badges{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+  .jp-symbol-mini{
+    width:26px;height:26px;object-fit:contain;
+    background:rgba(255,255,255,0.92);border-radius:6px;padding:2px;
+  }
+
+  /* set name */
+  .set-ov-name{
+    font-family:'Luckiest Guy','Bebas Neue';font-size:29px;color:var(--text);
+    letter-spacing:0.01em;line-height:1.05;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* Name + EN/JP language pill, side by side (added 2026-08-31, replaces
+     the old inline "(Japanese)" suffix that used to be baked into the
+     displayed name itself — see isJapaneseSetName()/shortSetName() in
+     data.js). Name keeps its own ellipsis; pill never shrinks. */
+  .set-ov-name-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;min-width:0;}
+  .set-ov-name-row .set-ov-name{margin-bottom:0;flex:1;min-width:0;}
+  .set-ov-lang-pill{
+    flex-shrink:0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:10px;
+    letter-spacing:0.03em;font-family:inherit;
+  }
+  .set-ov-lang-pill.en{background:rgba(99,179,237,0.18);color:#63b3ed;}
+  .set-ov-lang-pill.jp{background:rgba(245,101,101,0.18);color:#f56565;}
+  /* Card count + rarity pills right-aligned to free up left-side room for the
+     bigger symbol/logo/name above */
+  .set-ov-total{font-size:13px;color:var(--dim);margin-bottom:12px;text-align:right;}
+
+  /* rarity pill badges on set overview card */
+  .set-ov-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;justify-content:flex-end;}
+  .set-ov-pill{
+    font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px;
+    letter-spacing:0.02em;display:inline-flex;align-items:center;gap:4px;
+  }
+
+  /* ── SET DETAIL VIEW (card rows) ────────────────────────────────── */
+  .set-detail-header{
+    display:flex;align-items:center;gap:14px;margin-bottom:22px;
+    padding-bottom:14px;border-bottom:1px solid var(--line);
+  }
+  .set-detail-back{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    color:var(--dim);font-size:13px;font-family:inherit;cursor:pointer;
+    padding:8px 14px;transition:all .15s;white-space:nowrap;
+  }
+  .set-detail-back:hover{border-color:var(--gold);color:var(--gold);}
+  .set-detail-symbol{
+    width:26px;height:26px;object-fit:contain;
+  }
+  .set-detail-info{flex:1;}
+  .set-detail-era{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;}
+  .set-detail-name{font-family:'Luckiest Guy','Bebas Neue';font-size:24px;color:var(--text);letter-spacing:0.01em;line-height:1;}
+  .set-detail-name-row{display:flex;align-items:center;gap:8px;}
+
+  /* rarity group inside set detail */
+  .rarity-group{margin-bottom:24px;}
+  .rarity-group-header{
+    display:flex;align-items:center;gap:8px;
+    padding-bottom:8px;margin-bottom:4px;
+    border-bottom:1px solid var(--line);
+  }
+  .rarity-group-label{font-size:12px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;}
+  .rarity-group-count{font-size:12px;color:var(--dim);font-weight:600;}
+
+  /* ── CARD ROWS ───────────────────────────────────────────────────── */
+  .card-row{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 8px;border-bottom:1px solid rgba(43,47,61,0.4);
+    cursor:pointer;transition:background .1s;border-radius:7px;margin:0 -8px;
+  }
+  .card-row:last-child{border-bottom:none;}
+  .card-row:hover{background:var(--panel2);}
+  .card-row.owned{opacity:0.6;}
+  .card-row.owned .crow-name{text-decoration:line-through;color:var(--dim);}
+  .card-row.owned .crow-check{background:#4ade80;border-color:#4ade80;color:#0e1016;}
+
+  .crow-check{
+    width:20px;height:20px;flex-shrink:0;border:2px solid var(--line);border-radius:5px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;transition:all .15s;color:transparent;
+    background:transparent;cursor:pointer;
+  }
+  .crow-check.owned{background:#4ade80;border-color:#4ade80;color:#0e1016;}
+  .crow-check:hover{border-color:#4ade80;}
+  .crow-thumb{width:36px;height:50px;flex-shrink:0;border-radius:4px;object-fit:cover;background:var(--panel2);display:block;}
+  .crow-thumb-empty{width:36px;height:50px;flex-shrink:0;border-radius:4px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--line);}
+  .crow-num{font-size:11px;color:var(--dim);width:32px;flex-shrink:0;text-align:right;white-space:nowrap;}
+  .crow-name{flex:1;font-size:13.5px;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .crow-price-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0;white-space:nowrap;}
+  .crow-price{font-size:13px;font-weight:800;color:var(--price-gold-bright);white-space:nowrap;}
+
+  /* ── SET DETAIL CARD GRID (4 columns like screenshot) ───────────── */
+  .detail-card-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:4px 8px;
+  }
+  .detail-card-grid .card-row{margin:0;border-radius:6px;}
+
+  /* ── GRID VIEW (image tiles) ─────────────────────────────────────── */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
+  .card-tile{
+    background:linear-gradient(160deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative;
+  }
+  .card-tile:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 10px 28px rgba(0,0,0,0.4);}
+  .card-tile.owned{border-color:#4ade80;box-shadow:0 0 0 1px #4ade8040;}
+  .card-tile.owned img{opacity:0.5;}
+  .card-tile.owned .tile-name{color:var(--dim);text-decoration:line-through;}
+  .card-tile img{width:100%;display:block;aspect-ratio:2.5/3.5;object-fit:cover;background:var(--panel);}
+  .tile-info{padding:9px 11px;}
+  .tile-name{font-size:13px;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tile-set{font-size:10.5px;color:var(--dim);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tile-footer{display:flex;justify-content:space-between;align-items:center;}
+  .tile-price-row{display:flex;align-items:center;flex-wrap:wrap;gap:2px;}
+  .tile-price{font-size:12px;font-weight:800;color:var(--price-gold-bright);}
+  /* BUG FIX (2026-09-01): tile-psa10 (grid-view PSA10 ask price, see
+     tilePsa10Html() in rarity.js) had NO rule anywhere in this file — it
+     was rendering at the ambient inherited font-size (no explicit size on
+     any ancestor either, so it fell all the way back to the browser
+     default, ~2x .tile-price's deliberate 12px) instead of matching the
+     other price text on the tile. Jordan: "shrink the size of the psa 10
+     and its price on the card grid view. seems way too big and doesnt
+     match other price sizes." Sized to match .tile-price exactly; kept the
+     existing violet PSA10 branding color from .modal-70pct-psa10 above so
+     it still reads as a distinct badge, just no longer oversized. */
+  .tile-psa10{
+    font-size:12px;font-weight:800;color:#c084fc;
+    display:inline-block;margin-top:2px;white-space:nowrap;
+  }
+  .tile-check{
+    position:absolute;top:7px;right:7px;width:28px;height:28px;
+    background:rgba(14,16,22,0.75);border:2px solid var(--line);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;font-size:14px;
+    transition:all .15s;backdrop-filter:blur(4px);cursor:pointer;
+  }
+  .card-tile.owned .tile-check{background:#4ade80;border-color:#4ade80;color:#0e1016;}
+
+  /* FEATURE (2026-08-02): read-only share view — hide the owned checkbox and
+     the "owned" greyed-out/struck-through styling entirely. Since this view
+     defaults to grid+owned-only, every card on screen is owned by
+     definition, so the checkbox/greying is just noise here rather than
+     useful signal. Cards render at full opacity/detail instead. */
+  body.read-only-share .crow-check,
+  body.read-only-share .tile-check { display:none; }
+  body.read-only-share .card-row.owned { opacity:1; }
+  body.read-only-share .card-row.owned .crow-name { text-decoration:none; color:inherit; }
+  body.read-only-share .card-tile.owned { border-color:var(--line); box-shadow:none; }
+  body.read-only-share .card-tile.owned img { opacity:1; }
+  body.read-only-share .card-tile.owned .tile-name { color:inherit; text-decoration:none; }
+
+  /* FEATURE (2026-08-02): "Total Cards" stat hidden in read-only share view —
+     next to the Owned button, it's a distracting distinction since this view
+     is permanently locked to the owned-only grid anyway. */
+  body.read-only-share #statCardsBox { display:none; }
+
+  /* RARITY PILLS */
+  .pill{
+    font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;
+    letter-spacing:0.03em;display:inline-block;
+  }
+  /* One Piece rarity pills — SEC (Secret Rare, top chase tier) down to C
+     (Common). Colors match RARITY_COLOR in rarity.js. */
+  .pill-sec{background:#ff4d4d29;color:#ff4d4d;}
+  .pill-sr{background:#ffd70029;color:#ffd700;}
+  .pill-l{background:#ff8c4229;color:#ff8c42;}
+  .pill-tr{background:#a78bfa29;color:#a78bfa;}
+  .pill-r{background:#60a5fa29;color:#60a5fa;}
+  .pill-uc{background:#4ade8029;color:#4ade80;}
+  .pill-c{background:rgba(139,143,163,0.18);color:#8b8fa3;}
+  .pill-p{background:#f97d9c29;color:#f97d9c;}
+  .pill-default{background:rgba(139,143,163,0.14);color:var(--dim);}
+
+  /* MODAL */
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(6,7,12,0.88);
+    z-index:90;align-items:center;justify-content:center;padding:24px;
+  }
+  .modal-backdrop.active{display:flex;}
+  .modal{
+    background:linear-gradient(170deg,#1e2235,#13161f);
+    border:1px solid var(--line);border-radius:20px;padding:0;
+    max-width:460px;width:100%;position:relative;
+    box-shadow:0 32px 80px rgba(0,0,0,0.7);
+    max-height:94vh;overflow-y:auto;
+  }
+  /* Close button — 44px tap target for iOS */
+  .modal-close{
+    position:absolute;top:8px;right:8px;z-index:4;
+    background:rgba(14,16,22,0.7);border:1px solid var(--line);
+    color:var(--dim);font-size:20px;cursor:pointer;line-height:1;
+    width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    transition:background .15s,color .15s;-webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+  }
+  .modal-close:hover{background:var(--line);color:var(--text);}
+  /* Nav bar — top of modal (now only holds the counter, hidden) */
+  .modal-nav-bar{ display:none; }
+  .modal-nav-counter{ display:none; }
+
+  /* Nav arrows flanking the card image */
+  .modal-nav{
+    background:rgba(14,16,22,0.7);border:1px solid var(--line);
+    color:var(--text);font-size:24px;cursor:pointer;line-height:1;
+    width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    transition:background .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    user-select:none;flex-shrink:0;
+  }
+  .modal-nav:hover{background:var(--line);}
+  .modal-nav.disabled{opacity:0.2;pointer-events:none;}
+
+  /* Card image area — arrows on each side */
+  .modal-imgwrap{
+    background:linear-gradient(160deg,#1a1d2b,#0e1016);
+    padding:48px 12px 16px;
+    display:flex;flex-direction:row;align-items:center;justify-content:center;
+    gap:10px;min-height:300px;
+  }
+  .modal-img-center{
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .modal-imgwrap img{
+    width:300px;max-width:100%;max-height:58vh;border-radius:14px;display:block;
+    box-shadow:0 24px 64px rgba(0,0,0,0.8);
+  }
+  .modal-card-num{
+    font-size:16px;color:var(--dim);margin-top:10px;letter-spacing:0.04em;font-weight:700;
+  }
+  .modal-fallback{color:var(--dim);font-size:13px;padding:60px 10px;display:none;text-align:center;}
+
+  /* Content area */
+  .modal-body{padding:14px 22px 24px;text-align:center;}
+  .modal-name{font-family:'Luckiest Guy','Bebas Neue';font-size:24px;letter-spacing:0.01em;line-height:1.1;}
+  /* Rarity pill + set/series/date on one row instead of stacked, to reclaim
+     vertical space for a bigger price chart below. */
+  .modal-subrow{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin-top:6px;min-width:0;
+  }
+  .modal-meta{color:var(--dim);font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .modal-meta .meta-dot{color:var(--line);margin:0 1px;}
+  .modal-price{font-size:24px;font-weight:800;color:var(--price-gold-bright);margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;}
+
+  /* Action buttons */
+  .modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px;}
+  .modal-own{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    width:100%;padding:12px 18px;border-radius:12px;
+    background:transparent;border:1.5px solid #4ade80;color:#4ade80;font-weight:700;
+    font-size:14px;font-family:inherit;cursor:pointer;transition:all .2s;letter-spacing:0.01em;
+  }
+  .modal-own:hover{background:#4ade8018;box-shadow:0 0 0 1px #4ade8040;}
+  .modal-own.owned{background:#4ade8022;color:#4ade80;border-color:#4ade80;}
+  .modal-own.owned::before{content:'✓  ';}
+  .modal-buy{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:12px 18px;border-radius:12px;
+    background:var(--gold);color:#231a00;font-weight:700;text-decoration:none;
+    font-size:14px;letter-spacing:0.01em;transition:all .2s;
+  }
+  .modal-buy:hover{background:var(--gold-bright);box-shadow:0 4px 16px rgba(255,203,5,0.3);}
+  /* FEATURE (2026-08-22): "Find on eBay" button, same shape/size as the
+     TCGplayer button. REPLACED (2026-09-02) with "Find on PriceCharting" —
+     see modal.js's matching comment for why (shows ungraded + all graded
+     tiers from sold listings; PSA10 box stays on eBay, untouched). Kept a
+     distinct color (amber/gold, PriceCharting's own brand tone) rather than
+     reusing eBay's blue, so the two buttons stay visually distinguishable. */
+  .modal-buy--pricecharting{background:#fbbf24;color:#1a1400;}
+  .modal-buy--pricecharting:hover{background:#fcd34d;box-shadow:0 4px 16px rgba(251,191,36,0.35);}
+
+  /* FEATURE (2026-08-02): read-only share modal trimmed to just image, name,
+     rarity/set/series/date, price, and the TCGPlayer link — hide the price
+     history chart, "Mark as Owned" button, and purchase-price prompt. */
+  body.read-only-share .modal-chart-wrap,
+  body.read-only-share .modal-own,
+  body.read-only-share .modal-purchase-prompt { display:none !important; }
+
+  /* Purchase-price prompt — shown right after marking a card owned */
+  .modal-purchase-prompt{
+    margin-top:10px;padding:12px;border-radius:12px;
+    background:#4ade8012;border:1px solid #4ade8040;
+  }
+  .modal-purchase-prompt label{
+    display:block;font-size:12px;font-weight:700;color:var(--dim);
+    text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;
+  }
+  .modal-purchase-row{display:flex;gap:6px;}
+  #mPurchaseInput{
+    flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);
+    color:var(--text);padding:10px 12px;border-radius:8px;font-size:14px;font-family:inherit;
+  }
+  #mPurchaseInput:focus{outline:none;border-color:#4ade80;}
+  .modal-purchase-save,.modal-purchase-skip{
+    padding:10px 14px;border-radius:8px;font-weight:700;font-size:13px;
+    cursor:pointer;font-family:inherit;white-space:nowrap;
+  }
+  .modal-purchase-save{background:#4ade80;color:#0e1016;border:none;}
+  .modal-purchase-save:hover{background:#5eeb91;}
+  .modal-purchase-skip{background:transparent;color:var(--dim);border:1px solid var(--line);}
+  .modal-purchase-skip:hover{color:var(--text);border-color:var(--dim);}
+  .modal-purchase-hint{font-size:11px;color:var(--dim);margin-top:-2px;margin-bottom:10px;line-height:1.4;}
+
+  /* EMPTY */
+  .empty{text-align:center;padding:60px 20px;color:var(--dim);border:1px dashed var(--line);border-radius:12px;}
+  .empty .display{font-size:22px;color:var(--text);margin-bottom:8px;}
+
+  footer{text-align:center;color:var(--dim);font-size:12px;padding:20px;border-top:1px solid var(--line);}
+
+  /* TREND BUTTONS */
+  .trend-btn{white-space:nowrap;}
+  .trend-btn.active-gainers{background:#4ade8022;border-color:#4ade80;color:#4ade80;font-weight:700;}
+  .trend-btn.active-drops{background:#f8717122;border-color:#f87171;color:#f87171;font-weight:700;}
+
+  /* TREND VIEW */
+  .trend-section{margin-bottom:36px;}
+  .trend-header{
+    display:flex;align-items:center;gap:10px;
+    border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:14px;
+  }
+  .trend-title{font-family:'Luckiest Guy','Bebas Neue';font-size:22px;letter-spacing:0.04em;text-transform:uppercase;}
+  .trend-sub{font-size:12px;color:var(--dim);font-weight:600;}
+  .trend-rank{
+    width:24px;flex-shrink:0;font-size:12px;font-weight:800;
+    color:var(--dim);text-align:center;
+  }
+  .crow-set{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+
+  /* PRICE CHANGE BADGES */
+  .price-change{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;margin-left:4px;white-space:nowrap;}
+  /* FEATURE (2026-08-12): quiet "7D" prefix so every price-change badge in
+     the app reads clearly as a 7-day comparison, not same-day. Dimmer/lighter
+     weight than the percentage itself so it doesn't compete for attention. */
+  .price-change-period{font-weight:600;opacity:0.65;margin-right:2px;}
+  .price-up{background:#4ade8022;color:#4ade80;}
+  .price-down{background:#f8717122;color:#f87171;}
+  .price-flat{color:var(--dim);}
+  .price-stale{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;margin-left:4px;white-space:nowrap;background:#fbbf2422;color:#fbbf24;cursor:help;}
+  .tile-price-row{display:flex;align-items:center;flex-wrap:wrap;gap:2px;}
+
+  /* FEATURE (2026-08-02): compact stale-price warning icon, sits inline right
+     next to the price in list rows / grid tiles (the .price-stale text pill
+     above stays modal-only, where there's room to spell out day counts).
+     Yellow at 7+ days unpriced (STALE_PRICE_DAYS), red at 30+ days
+     (STALE_PRICE_DAYS_SEVERE) — see staleWarningIcon() in rarity-binder.js. */
+  .price-stale-icon{font-size:12px;line-height:1;margin-left:3px;cursor:help;color:#fbbf24;display:inline-block;vertical-align:middle;}
+  .price-stale-icon.severe{color:#f87171;}
+
+  /* ADDED 2026-08-24: "Price Volatile" flag — TCGplayer's own cheapest
+     active listing is 25%+ above its own market price (the old price-gap
+     trigger, now surfaced as a standalone signal since eBay checks are
+     unconditional and no longer gated on it — see rarity-binder.js's
+     priceVolatileIcon()/priceVolatileBadge()). Blue, and a different glyph
+     (⇄) from the yellow/red stale-price ⚠ above, so the two warnings read
+     as distinct signals when shown side by side rather than duplicates. */
+  .price-volatile-icon{font-size:12px;line-height:1;margin-left:3px;cursor:help;color:#60a5fa;display:inline-block;vertical-align:middle;}
+  .price-volatile{font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;margin-left:4px;white-space:nowrap;background:#60a5fa22;color:#60a5fa;cursor:help;}
+
+  /* "70%" price (70% of market price) — quiet secondary label, sits below/
+     beside the main price without competing with it visually. */
+  .price-70pct{font-size:10.5px;font-weight:600;color:var(--dim);white-space:nowrap;cursor:help;margin-left:4px;}
+  .modal-70pct{font-size:13px;font-weight:600;color:var(--dim);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .modal-purchase-price{font-size:13px;font-weight:700;color:#4ade80;margin-top:2px;}
+
+  /* FEATURE (2026-08-24): PSA10 box, modal only — always visible next to the
+     70% line (not just when a price is known), clickable through to a live
+     eBay PSA 10 search either way. Jordan: "show this price box on every
+     card now(right of the 70%), so that when it either has or doesnt have a
+     price i can still click the box and go to ebay for the psa 10 lookup."
+     Violet to stay visually distinct from the blue price-volatile/stale
+     icons and the green purchase-price line. Styled as a small pill/button
+     (border + padding) rather than plain text, since it's now interactive. */
+  .modal-70pct-psa10{
+    display:inline-block;font-size:11px;font-weight:700;color:#c084fc;
+    border:1px solid #c084fc55;border-radius:5px;padding:2px 7px;
+    text-decoration:none;white-space:nowrap;cursor:pointer;
+    transition:background-color 0.15s,border-color 0.15s;
+  }
+  .modal-70pct-psa10:hover{background:#c084fc1a;border-color:#c084fc;}
+
+  /* ONE PIECE STAT BOXES — Color / Type / Cost / Power / Life / Counter /
+     Attribute, replacing Pokémon's HP/type/weakness row. Small uniform grid
+     of labeled boxes under the price block. */
+  .modal-stats{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+    margin-top:14px;text-align:left;
+  }
+  .mstat-box{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;
+  }
+  .mstat-label{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:2px;}
+  .mstat-val{font-size:14px;font-weight:700;color:var(--text);word-break:break-word;}
+
+  /* Card text (rules text) — left-aligned reading block below the stat grid */
+  .modal-card-text{
+    margin-top:12px;padding:10px 12px;text-align:left;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    font-size:12.5px;line-height:1.5;color:var(--dim);
+    max-height:160px;overflow-y:auto;
+  }
+  .modal-card-text:empty{display:none;}
+
+  /* FEATURE (2026-08-12): condition-tiered pricing (NM/LP/MP/HP/DMG) grid,
+     modal only — see conditionPrices() in rarity.js. Quiet, compact 5-across
+     row so it doesn't compete visually with the main price above it. */
+  .modal-condition-prices{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:6px;
+    margin-top:10px;padding:8px 4px;
+    background:var(--panel,#1a1d27);border:1px solid var(--line);border-radius:8px;
+  }
+  .cond-source{
+    grid-column:1/-1;font-size:9px;text-align:center;
+    color:var(--dim);opacity:0.7;margin-bottom:2px;letter-spacing:0.2px;
+  }
+  .cond-source--estimate{font-style:italic;}
+  .cond-row{display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .cond-key{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:0.3px;display:inline-flex;align-items:center;gap:3px;}
+  .cond-val{font-size:13px;font-weight:700;color:var(--price-gold-bright);}
+  /* FEATURE (2026-08-13): per-CELL source indicator — a triggered card's
+     row can be mixed-source (some conditions from eBay, others falling
+     back to JustTCG when eBay came back too thin), so each cell gets its
+     own small dot instead of one row-wide banner claiming a single source
+     for all 5. Same blue used elsewhere for eBay-sourced figures (TAG Slab
+     price, etc.) so eBay-origin numbers read as visually related across
+     the app; JustTCG dot uses the app's neutral gold accent instead. */
+  .cond-dot{
+    display:inline-block;width:5px;height:5px;border-radius:50%;
+    flex-shrink:0;cursor:help;
+  }
+  .cond-dot--ebay{background:#60a5fa;}
+  .cond-dot--justtcg{background:var(--gold-bright);opacity:0.6;}
+  /* FEATURE (2026-08-13): 70%-of-market vendor-offer price, now shown as a
+     smaller secondary line underneath the real market price (cond-val)
+     rather than replacing it — see conditionPrices()/modal.js render for
+     the reasoning (vendor buy-low/sell-real math needs both numbers). */
+  .cond-val-70{font-size:10px;font-weight:600;color:var(--dim);}
+
+  /* FEATURE (2026-08-22): per-condition "verify this price" links — click
+     eBay or TCG next to any condition cell to open a pre-filled search for
+     that exact card + condition (+ print/edition where it matters), so any
+     price can be manually spot-checked in one click. See verify_links.js. */
+  .cond-verify{display:flex;gap:6px;margin-top:1px;}
+  .cond-verify a{
+    font-size:9px;font-weight:600;color:var(--dim);text-decoration:none;
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+    letter-spacing:0.2px;transition:color 0.15s,border-color 0.15s;
+  }
+  .cond-verify a:hover{color:var(--gold-bright);border-color:var(--gold-bright);}
+
+  /* FEATURE (2026-08-13): eBay verification fields, modal only — shown
+     alongside (never replacing) the TCGplayer price above. Verified eBay
+     (Raw) only appears when the price-gap variance trigger fired; TAG Slab
+     only for cards on the manual allowlist. Styled distinctly from the
+     condition-price grid so the two data sources (TCGplayer vs. eBay) read
+     as visually separate, not part of the same table. */
+  .modal-ebay-prices{
+    display:flex;flex-direction:column;gap:4px;
+    margin-top:8px;padding:8px 10px;
+    background:var(--panel,#1a1d27);border:1px solid var(--line);border-radius:8px;
+  }
+  .ebay-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .ebay-label{font-size:11px;font-weight:600;color:var(--dim);cursor:help;}
+  .ebay-val{font-size:13px;font-weight:700;color:#4ade80;}
+  .ebay-val--slab{color:#60a5fa;}
+
+  /* List view change column */
+  .td-change{font-size:12px;font-weight:700;white-space:nowrap;}
+
+  /* PRICE HISTORY CHART IN MODAL */
+  .modal-chart-wrap{
+    margin-top:12px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;
+  }
+  .modal-chart-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+  #priceChart{width:100%!important;height:160px!important;}
+  .modal-chart-empty{font-size:12px;color:var(--dim);text-align:center;padding:18px 0;}
+
+  /* MOBILE FILTER DRAWER */
+  .filter-drawer{
+    display:none;max-width:1280px;margin:0 auto;padding:0 16px 12px;
+    gap:10px;flex-wrap:wrap;
+  }
+  .filter-drawer.open{display:flex;}
+  .filter-drawer select{flex:1;min-width:140px;}
+  .filter-toggle-btn{
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    padding:11px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;
+    display:none;align-items:center;gap:6px;transition:border-color .15s,color .15s;
+  }
+  .filter-toggle-btn.active{border-color:var(--gold);color:var(--gold);}
+
+  @media(max-width:700px){
+    /* Header — compact on mobile */
+    header.hero{padding:10px 16px 14px;overflow:hidden;}
+    .eyebrow{display:none;}
+    .sub{display:none;}
+    .auth-btn{padding:5px 10px;font-size:11px;}
+
+    /* Prevent horizontal scroll on body */
+    body{overflow-x:hidden;}
+    main{overflow-x:hidden;}
+
+    /* Stats — 3 equal columns, no overflow */
+    .stats-row{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;margin-top:14px;
+      width:100%;box-sizing:border-box;
+    }
+    .stat{min-width:0;padding:10px 8px;box-sizing:border-box;}
+    .stat .n{font-size:20px;word-break:break-all;}
+    .stat .l{font-size:10px;}
+
+    /* Toolbar — centered column layout */
+    .toolbar{
+      padding:12px 16px 0;margin-top:12px;
+      flex-direction:column;gap:10px;
+      align-items:stretch;
+    }
+    .search-wrap{min-width:0;width:100%;}
+    .toolbar-row2{
+      display:flex;gap:8px;width:100%;align-items:center;
+      justify-content:center;
+    }
+    .filter-toggle-btn{
+      display:flex;flex:1;justify-content:center;
+      padding:14px;font-size:15px;
+    }
+
+    /* Hide desktop controls on mobile — all live in quick-row / filter-drawer */
+    .toolbar select{display:none;}
+    .toolbar .view-toggle{display:none;}
+    .toolbar .trend-btn{display:none;}
+    #resetBtn{display:none!important;} /* always hidden on mobile — quick-row has resetBtnM */
+
+    /* Filter drawer */
+    .filter-drawer{padding:0 16px 16px;}
+    .filter-drawer select{
+      width:100%;flex:none;
+      padding:14px 12px;font-size:15px;
+      border-radius:10px;
+    }
+    /* mobile-view-toggle and mobile-trend-row now live in quick-row, not the drawer */
+    .mobile-view-toggle{display:none;}
+    .mobile-trend-row{display:none;}
+
+    /* Quick action row — mobile only, always shows Reset */
+    .quick-row{
+      display:none;max-width:1280px;margin:10px auto 0;padding:0 16px 10px;
+      gap:8px;
+    }
+    .quick-row.visible{display:flex;}
+    .quick-row .vbtn{flex:1;text-align:center;padding:13px 8px;font-size:14px;}
+    /* Reset always visible in quick-row on mobile */
+    .quick-row .reset-btn{
+      flex:1;text-align:center;
+      display:flex!important;
+      border-color:#f87171;color:#f87171;background:#f8717112;
+      font-size:14px;padding:13px 8px;font-weight:700;border-radius:8px;
+      align-items:center;justify-content:center;
+    }
+
+    /* Main padding */
+    main{padding:16px 12px 80px;}
+
+    /* Set overview — 1 column on mobile */
+    /* BUG FIX (2026-08-27): grid-template-columns:1fr alone doesn't stop a
+       long set title from pushing the card wider than the viewport — grid
+       items default to min-width:auto, so a track refuses to shrink below
+       its content's unbroken intrinsic width (the "grid blowout" bug).
+       Confirmed live at 360x780: "Expansion Pack (No Rarity) (Japanese)"
+       measured 556px wide, clipped off the right edge of the screen with
+       no ellipsis ever kicking in, because .set-ov-name's overflow:hidden
+       had nothing to actually clip against. min-width:0 lets the card
+       shrink to the grid track's real (viewport) width, which then lets
+       .set-ov-name's existing white-space:nowrap + text-overflow:ellipsis
+       do its job. */
+    .set-overview-grid{grid-template-columns:1fr;}
+    .set-ov-card{min-width:0;}
+
+    /* Detail card grid — SINGLE column on mobile so nothing cuts off */
+    .detail-card-grid{grid-template-columns:1fr;}
+
+    /* Card rows — single column, full width, no overflow */
+    .card-row{
+      padding:10px 10px;
+      flex-wrap:nowrap;
+      gap:8px;
+      width:100%;box-sizing:border-box;
+      overflow:hidden;
+    }
+    .crow-num{font-size:13px;width:36px;flex-shrink:0;text-align:right;white-space:nowrap;}
+    .crow-thumb{width:40px;height:56px;flex-shrink:0;}
+    .crow-thumb-empty{width:40px;height:56px;flex-shrink:0;}
+    /* Name: takes remaining space, always truncates before touching price */
+    .crow-name{font-size:14px;flex:1 1 0;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
+    /* Price: absolutely fixed — never shrinks, never grows */
+    .crow-price-wrap{
+      flex:0 0 92px;width:92px;
+      flex-direction:column;align-items:flex-end;gap:2px;
+    }
+    .crow-price{font-size:13px;white-space:nowrap;overflow:hidden;}
+    .price-change{font-size:10px;padding:2px 5px;white-space:nowrap;}
+    .trend-rank{font-size:13px;min-width:18px;flex-shrink:0;}
+    .crow-set{max-width:100px;}
+
+    /* Stats — prevent right cutoff */
+    .stats-row{overflow:hidden;}
+
+    /* Modal — full-height bottom sheet, stretches north */
+    .modal-backdrop{padding:0;align-items:flex-end;}
+    .modal{
+      max-width:100%;border-radius:20px 20px 0 0;
+      height:100vh;max-height:100vh;overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    .modal-nav{width:34px;height:34px;font-size:20px;}
+    .modal-imgwrap{
+      min-height:0;
+      padding:44px 8px 10px;
+      gap:6px;
+    }
+    .modal-imgwrap img{
+      /* FEATURE (2026-08-13): shrunk ~10% (240px -> 216px, 50vh -> 45vh) to
+         reclaim vertical space in the mobile bottom-sheet modal — the
+         "Find on TCGplayer" button was getting cut off/crowded once the
+         eBay verification block (Verified eBay Price / TAG Slab Price,
+         shown alongside the 70%-of-market condition grid) was added below
+         the price. Image is still the visual anchor of the modal, just
+         slightly smaller so everything else fits above the fold more often. */
+      width:216px;max-width:100%;max-height:45vh;
+    }
+    .modal-body{padding:6px 20px 20px;text-align:left;}
+    .modal-name{font-size:20px;}
+    .modal-subrow{justify-content:flex-start;margin-top:5px;}
+    .modal-meta{font-size:11px;line-height:1.3;}
+    .modal-price{font-size:20px;margin-top:6px;justify-content:flex-start;}
+    .modal-condition-prices{gap:3px;padding:6px 2px;}
+    .cond-key{font-size:9px;}
+    .cond-val{font-size:11px;}
+    .cond-val-70{font-size:8.5px;}
+    .modal-ebay-prices{padding:6px 8px;}
+    .ebay-label{font-size:10px;}
+    .ebay-val{font-size:12px;}
+    .modal-chart-wrap{margin-top:8px;}
+    #priceChart{height:140px!important;}
+    .modal-chart-label{font-size:9px;}
+    .modal-actions{margin-top:16px;gap:6px;}
+    .modal-own,.modal-buy{padding:12px 16px;font-size:14px;}
+
+    /* FEATURE (2026-08-02): read-only share modal on mobile only — the
+       chart/own-button/purchase-prompt are hidden (see body.read-only-share
+       rules above), but .modal{height:100vh} still forced the sheet to fill
+       the full screen regardless, leaving a large empty gap below the
+       TCGPlayer button. Let the modal size to its (now shorter) content
+       instead, just for this view. Desktop/web is untouched by request. */
+    body.read-only-share .modal{
+      height:auto;max-height:94vh;
+    }
+
+    /* Era headers */
+    .era-title{font-size:18px;}
+
+    footer{font-size:11px;padding:16px;}
+  }
