@@ -21,8 +21,15 @@ if ('serviceWorker' in navigator) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OP Binder">
-<!-- Straw hat / Jolly Roger style SVG favicon inline via data URI (red/black) -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230d0708' stroke='%23e63946' stroke-width='4'/%3E%3Ccircle cx='50' cy='42' r='22' fill='%23f1e9df'/%3E%3Cpath d='M20 46 Q50 20 80 46 L80 50 Q50 30 20 50 Z' fill='%23e63946'/%3E%3Ccircle cx='41' cy='40' r='4' fill='%230d0708'/%3E%3Ccircle cx='59' cy='40' r='4' fill='%230d0708'/%3E%3Cpath d='M38 52 Q50 60 62 52' stroke='%230d0708' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<!-- FAVICON/HOME-SCREEN ICON (2026-09-07, per Jordan): the Straw Hat Jolly
+     Roger flag, hotlinked from mystickermania.com -- same architecture as
+     every card image in this app (referenced by URL, never downloaded/
+     mirrored into the repo). If that URL ever goes down or moves, this
+     icon breaks and needs a new source; nothing else in the app depends
+     on it. rel="icon" covers the browser tab; apple-touch-icon covers
+     "Add to Home Screen" on iPhone (Jordan's second ask). -->
+<link rel="icon" type="image/png" href="https://mystickermania.com/cdn/stickers/one-piece/one-piece-straw-pirates-flag-512x512.png">
+<link rel="apple-touch-icon" href="https://mystickermania.com/cdn/stickers/one-piece/one-piece-straw-pirates-flag-512x512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Luckiest+Guy&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
