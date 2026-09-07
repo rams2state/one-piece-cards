@@ -59,18 +59,9 @@ function openModal(c, updateList = true) {
   document.getElementById('mMeta').innerHTML =
     [c.set, c.setId].filter(Boolean).join(' <span class="meta-dot">·</span> ');
 
-  // Stat boxes: Color, Type, Cost, Power, Life, Counter, Attribute
-  const statEl = document.getElementById('mStats');
-  if (statEl) {
-    const stats = [
-      ['Color', c.color], ['Type', c.cardType], ['Cost', c.cost],
-      ['Power', c.power], ['Life', c.life], ['Counter', c.counter],
-      ['Attribute', c.attribute],
-    ].filter(([, v]) => v !== '' && v !== null && v !== undefined);
-    statEl.innerHTML = stats.map(([label, val]) =>
-      `<div class="mstat-box"><div class="mstat-label">${label}</div><div class="mstat-val">${val}</div></div>`
-    ).join('');
-  }
+  // REMOVED 2026-09-06 per Jordan: "dont really care for this block" (the
+  // Color/Type/Cost/Power/Life/Counter/Attribute stat-box grid). The
+  // #mStats container itself was also removed from the HTML/CSS.
   const textEl = document.getElementById('mCardText');
   if (textEl) textEl.textContent = c.text || '';
 

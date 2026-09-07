@@ -124,19 +124,23 @@ function getFiltered() {
     return true;
   });
 
-  const parseNum = id => { const m = (id || '').match(/-(\d+)/); return m ? parseInt(m[1], 10) : 0; };
   const setGroupKey = c => c.setId || '';
 
+  // Uses the same cardNumSort() as set-detail (see its definition below for
+  // why: same-number prints -- base/parallel/alt-art/manga/reprint -- need
+  // a deterministic tie-break, not just a raw number compare, so an
+  // alt-art print doesn't drift to an unpredictable spot relative to its
+  // base print across reloads.
   cards.sort((a, b) => {
     if (sort === 'date-asc') {
       return setSortIndex(a.setId) - setSortIndex(b.setId)
         || setGroupKey(a).localeCompare(setGroupKey(b))
-        || parseNum(a.cardId) - parseNum(b.cardId);
+        || cardNumSort(a, b);
     }
     if (sort === 'date-desc') {
       return setSortIndex(b.setId) - setSortIndex(a.setId)
         || setGroupKey(b).localeCompare(setGroupKey(a))
-        || parseNum(b.cardId) - parseNum(a.cardId);
+        || cardNumSort(b, a);
     }
     if (sort === 'price-desc') return priceVal(b.price) - priceVal(a.price);
     if (sort === 'price-asc') {
@@ -206,6 +210,44 @@ function setTrend(mode) {
   render();
 }
 
+// FIXED 2026-09-06: cardNumSort used to sort purely by the numeric card
+// number (e.g. "120" from "OP01-120"), which put every print of the same
+// card -- base, parallel, alt-art, manga, reprint -- at the exact same
+// sort key. Array.sort() isn't guaranteed stable across engines for a
+// tie, so an alt-art print (like OP01-120_p2, "Shanks (Manga) (Alternate
+// Art)", $1,532.80) could land ANYWHERE relative to its base print with
+// no visual cue explaining why -- caught 2026-09-06 when Jordan couldn't
+// find that alt-art in the set view even though it was correctly in the
+// CSV the whole time. Now sorts same-number prints deterministically:
+// base print first, then by suffix (_p1, _p2, _r1, ...) in order, so
+// every print of a card is grouped together and always in the same order
+// on every load. Hoisted to module scope (was nested in renderSetDetail)
+// so renderTrend/renderFlatList can use the matching printBadge() below.
+function cardNumSort(a, b) {
+  const parse = id => { const m = (id || '').match(/-(\d+)/); return m ? parseInt(m[1], 10) : 0; };
+  const numA = parse(a.cardId), numB = parse(b.cardId);
+  if (numA !== numB) return numA - numB;
+  const suffix = id => { const m = (id || '').match(/_(p|r)(\d+)$/i); return m ? [m[1].toLowerCase(), parseInt(m[2], 10)] : ['', 0]; };
+  const [typeA, ordA] = suffix(a.cardId);
+  const [typeB, ordB] = suffix(b.cardId);
+  if (typeA !== typeB) return typeA.localeCompare(typeB); // '' (base) sorts before 'p'/'r'
+  return ordA - ordB;
+}
+
+// Short, unambiguous print-variant label for a list row -- replaces the
+// old bare "_p1"/"_p2" suffix on the number badge (which read as
+// meaningless noise, not as "this is a different, much rarer print").
+function printBadge(c) {
+  const m = (c.cardId || '').match(/_(p|r)(\d+)$/i);
+  if (!m) return '';
+  const name = c.rawName || c.name || '';
+  if (/manga/i.test(name)) return 'Manga';
+  if (/alternate art/i.test(name)) return 'Alt Art';
+  if (/reprint/i.test(name)) return 'Reprint';
+  if (c.isSpecial) return 'SP';
+  return 'Parallel';
+}
+
 function renderTrend(el) {
   const MIN_PRICE = 2.00;
   const withChange = ALL_CARDS
@@ -254,12 +296,13 @@ function renderTrend(el) {
     const arrow = c._delta >= 0 ? '↑' : '↓';
     const badge = `<span class="price-change ${cls}"><span class="price-change-period">7D</span> ${arrow} ${sign}$${Math.abs(c._delta).toFixed(2)} (${sign}${c._pct.toFixed(1)}%)</span>`;
     const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
+    const pBadgeHtml1 = printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : '';
     html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
       <span class="trend-rank">${i + 1}</span>
       <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
       ${thumbHtml}
       <div style="flex:1;min-width:0;">
-        <div class="crow-name">${c.name || '—'}</div>
+        <div class="crow-name">${c.name || '—'}${pBadgeHtml1}</div>
         <div class="crow-set">${c.set}</div>
       </div>
       <div class="crow-price-wrap">
@@ -285,12 +328,13 @@ function renderFlatList(cards, el, title) {
     const cdata = JSON.stringify(c).replace(/'/g, '&#39;');
     const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
     const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
+    const pBadgeHtml2 = printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : '';
     html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
       <span class="trend-rank">${i + 1}</span>
       <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
       ${thumbHtml}
       <div style="flex:1;min-width:0;">
-        <div class="crow-name">${c.name || '—'}</div>
+        <div class="crow-name">${c.name || '—'}${pBadgeHtml2}</div>
         <div class="crow-set">${c.set}</div>
       </div>
       <div class="crow-price-wrap">
@@ -477,11 +521,6 @@ function renderSetDetail(cards, el) {
   const setName = cards[0]?.set || setId;
   const total = cards.length;
 
-  function cardNumSort(a, b) {
-    const parse = id => { const m = (id || '').match(/-(\d+)/); return m ? parseInt(m[1], 10) : 0; };
-    return parse(a.cardId) - parse(b.cardId);
-  }
-
   const byRarity = {};
   for (const c of cards) {
     const r = c.rarity || 'Unknown';
@@ -518,11 +557,13 @@ function renderSetDetail(cards, el) {
       const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
       const changeBadge = priceChangeBadge(c.price, c.cardId);
       const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
+      const pBadge = printBadge(c);
+      const pBadgeHtml = pBadge ? `<span class="crow-print-badge">${pBadge}</span>` : '';
       html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
         <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
         ${thumbHtml}
-        <span class="crow-num">${(c.cardId || '').replace(/^[A-Z0-9]+-/, '#')}</span>
-        <span class="crow-name">${c.name || '—'}</span>
+        <span class="crow-num">${(c.cardId || '').replace(/^[A-Z0-9]+-/, '#').replace(/_(p|r)\d+$/i, '')}</span>
+        <span class="crow-name">${c.name || '—'}${pBadgeHtml}</span>
         <div class="crow-price-wrap">
           <span class="crow-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}${changeBadge}
           ${seventyPercentBadgeHtml(c)}
@@ -562,7 +603,7 @@ function renderTileHtml(c) {
       ${imgTag}
       <div class="tile-check" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
       <div class="tile-info">
-        <div class="tile-name" title="${c.name || ''}">${c.name || '—'}</div>
+        <div class="tile-name" title="${c.name || ''}">${c.name || '—'}${printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : ''}</div>
         <div class="tile-set" title="${c.set}">${c.set}</div>
         <div class="tile-footer">
           <div class="tile-price-row"><span class="tile-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}${seventyPercentBadgeHtml(c)}${changeBadge}</div>
