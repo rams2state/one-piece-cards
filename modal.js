@@ -62,8 +62,10 @@ function openModal(c, updateList = true) {
   // REMOVED 2026-09-06 per Jordan: "dont really care for this block" (the
   // Color/Type/Cost/Power/Life/Counter/Attribute stat-box grid). The
   // #mStats container itself was also removed from the HTML/CSS.
-  const textEl = document.getElementById('mCardText');
-  if (textEl) textEl.textContent = c.text || '';
+  //
+  // REMOVED 2026-09-07 per Jordan: "lets remove the box in between price
+  // and price chart" -- that was the card's rules/oracle text block
+  // (#mCardText). Removed from the HTML/CSS too.
 
   // Price with 7-day change
   const cv = priceVal(c.price);

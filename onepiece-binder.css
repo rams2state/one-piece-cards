@@ -652,14 +652,10 @@
      (.modal-stats/.mstat-box/.mstat-label/.mstat-val), shown under the
      price block. The #mStats container was removed from the HTML too. */
 
-  /* Card text (rules text) — left-aligned reading block below the stat grid */
-  .modal-card-text{
-    margin-top:12px;padding:10px 12px;text-align:left;
-    background:var(--panel);border:1px solid var(--line);border-radius:8px;
-    font-size:12.5px;line-height:1.5;color:var(--dim);
-    max-height:160px;overflow-y:auto;
-  }
-  .modal-card-text:empty{display:none;}
+  /* REMOVED 2026-09-07 per Jordan: "lets remove the box in between price
+     and price chart" -- was the card's rules/oracle text block
+     (.modal-card-text), shown between the price and Price History chart.
+     The #mCardText container was removed from the HTML too. */
 
   /* FEATURE (2026-08-12): condition-tiered pricing (NM/LP/MP/HP/DMG) grid,
      modal only — see conditionPrices() in rarity.js. Quiet, compact 5-across

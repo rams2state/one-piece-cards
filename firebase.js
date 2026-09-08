@@ -202,12 +202,34 @@ window.addEventListener('owned-changed', e => {
 
 // ── Auth button handler ─────────────────────────────────────────────────────
 window._fbSignIn = async () => {
-  if (!_firebaseAvailable) return;
+  if (!_firebaseAvailable) {
+    alert('Sign-in is unavailable: Firebase failed to initialize. Check the browser console for details.');
+    return;
+  }
   if (_currentUid) {
     await signOut(auth);
   } else {
     try { await signInWithPopup(auth, provider); }
-    catch (e) { console.warn('Sign-in failed', e); }
+    catch (e) {
+      // FIXED 2026-09-07: sign-in failures used to be console.warn-only,
+      // so clicking "Sign in" with e.g. an unauthorized-domain error (the
+      // #1 first-run Firebase gap -- GitHub Pages' domain not yet added
+      // under Authentication > Settings > Authorized domains) or a
+      // popup-blocked error looked exactly like nothing happening at all.
+      // Now surfaces the actual Firebase error code so it's diagnosable
+      // from the page itself, not just devtools.
+      console.warn('[Firebase] Sign-in failed', e);
+      const code = e && e.code ? e.code : 'unknown-error';
+      let msg = `Sign-in failed (${code}).`;
+      if (code === 'auth/unauthorized-domain') {
+        msg += ' This site\'s domain is not yet authorized in Firebase Console under Authentication > Settings > Authorized domains.';
+      } else if (code === 'auth/popup-blocked') {
+        msg += ' Your browser blocked the sign-in popup -- allow popups for this site and try again.';
+      } else if (code === 'auth/popup-closed-by-user') {
+        return; // user closed it themselves, not a real error -- no need to alert
+      }
+      alert(msg);
+    }
   }
 };
 
