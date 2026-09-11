@@ -439,6 +439,9 @@
   .pill-uc{background:#4ade8029;color:#4ade80;}
   .pill-c{background:rgba(139,143,163,0.18);color:#8b8fa3;}
   .pill-p{background:#f97d9c29;color:#f97d9c;}
+  /* ADDED 2026-09-10: Gold/Silver/Special DON!! cards. Color matches
+     RARITY_COLOR['DON!!'] in rarity.js. */
+  .pill-don{background:#e8c34a29;color:#e8c34a;}
   .pill-default{background:rgba(139,143,163,0.14);color:var(--dim);}
 
   /* MODAL */

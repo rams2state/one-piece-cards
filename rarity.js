@@ -4,7 +4,13 @@
 
 // Rarest-first order — drives set-detail rarity-group ordering and the
 // rarity dropdown's sort.
-const RARITY_ORDER = ['SEC', 'SR', 'L', 'TR', 'R', 'UC', 'C', 'P', 'PR'];
+// ADDED 2026-09-10: 'DON!!' placed near the top — the only DON!! rows
+// that make it into the CSV at all are chase-tier Gold/Silver/Special/
+// Alternate Art prints (see is_chase.py), which run as high as the
+// hundreds of dollars (a "(Gold)" print was confirmed at $722.82) — well
+// above typical SR/L pricing, so it's ranked alongside SEC/SR rather than
+// down with the plain rarities.
+const RARITY_ORDER = ['SEC', 'DON!!', 'SR', 'L', 'TR', 'R', 'UC', 'C', 'P', 'PR'];
 function rarityRank(r) {
   const idx = RARITY_ORDER.indexOf(r);
   return idx === -1 ? 99 : idx;
@@ -20,6 +26,7 @@ const RARITY_DISPLAY = {
   'C':   'Common',
   'P':   'Promo',
   'PR':  'Promo',
+  'DON!!': 'DON!! Card',
 };
 
 const RARITY_COLOR = {
@@ -32,6 +39,7 @@ const RARITY_COLOR = {
   'C':   '#8b8fa3', // common — dim gray
   'P':   '#f97d9c', // promo — pink
   'PR':  '#f97d9c',
+  'DON!!': '#e8c34a', // gold DON!! cards — distinct warm gold, separate from SR's brighter gold
 };
 
 function rarityColor(r) { return RARITY_COLOR[r] || '#8b8fa3'; }
@@ -40,6 +48,7 @@ function rarityClass(r) {
   const map = {
     'SEC': 'pill-sec', 'SR': 'pill-sr', 'L': 'pill-l', 'TR': 'pill-tr',
     'R': 'pill-r', 'UC': 'pill-uc', 'C': 'pill-c', 'P': 'pill-p', 'PR': 'pill-p',
+    'DON!!': 'pill-don',
   };
   return map[r] || 'pill-default';
 }
