@@ -634,21 +634,11 @@
   .modal-70pct{font-size:13px;font-weight:600;color:var(--dim);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .modal-purchase-price{font-size:13px;font-weight:700;color:#4ade80;margin-top:2px;}
 
-  /* FEATURE (2026-08-24): PSA10 box, modal only — always visible next to the
-     70% line (not just when a price is known), clickable through to a live
-     eBay PSA 10 search either way. Jordan: "show this price box on every
-     card now(right of the 70%), so that when it either has or doesnt have a
-     price i can still click the box and go to ebay for the psa 10 lookup."
-     Violet to stay visually distinct from the blue price-volatile/stale
-     icons and the green purchase-price line. Styled as a small pill/button
-     (border + padding) rather than plain text, since it's now interactive. */
-  .modal-70pct-psa10{
-    display:inline-block;font-size:11px;font-weight:700;color:#c084fc;
-    border:1px solid #c084fc55;border-radius:5px;padding:2px 7px;
-    text-decoration:none;white-space:nowrap;cursor:pointer;
-    transition:background-color 0.15s,border-color 0.15s;
-  }
-  .modal-70pct-psa10:hover{background:#c084fc1a;border-color:#c084fc;}
+  /* REMOVED 2026-09-16 per Jordan: "just like the pokemon app, we need to
+     remove the psa10 button" -- .modal-70pct-psa10 (the "Check PSA 10
+     price" pill added 2026-08-24) deleted along with the HTML that used
+     it (modal.js). The eBay link now lives in modal-actions instead (see
+     .modal-buy--pricecharting below, repointed to a general eBay search). */
 
   /* REMOVED 2026-09-06 per Jordan: "dont really care for this block" --
      was the Color/Type/Cost/Power/Life/Counter/Attribute stat-box grid

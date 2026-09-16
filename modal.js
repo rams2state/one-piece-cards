@@ -83,13 +83,13 @@ function openModal(c, updateList = true) {
   if (staleBadge) priceHtml += ' ' + staleBadge;
 
   if (!READ_ONLY_SHARE) {
+    // REMOVED 2026-09-16 per Jordan: "just like the pokemon app, we need
+    // to remove the psa10 button" -- the "Check PSA 10 price" link that
+    // used to render here is gone; the eBay link now lives in the
+    // modal-actions row instead (see mBuyEbay below), same as Pokémon.
     const seventyLabel = seventyPercentLabel(c);
-    const psa10Url = buildEbayPsa10Url(c);
-    const psa10Box = `<a class="modal-70pct-psa10" href="${psa10Url}" target="_blank" rel="noopener" title="No PSA 10 price data yet — click to search eBay for PSA 10 listings of this card.">Check PSA 10 price →</a>`;
     if (seventyLabel) {
-      priceHtml += `<div class="modal-70pct">70%: ${seventyLabel}${psa10Box}</div>`;
-    } else {
-      priceHtml += `<div class="modal-70pct">${psa10Box}</div>`;
+      priceHtml += `<div class="modal-70pct">70%: ${seventyLabel}</div>`;
     }
     const purchasePrice = ownedPurchasePrice(c);
     if (purchasePrice !== null && purchasePrice > 0) {
@@ -111,8 +111,13 @@ function openModal(c, updateList = true) {
   }
 
   document.getElementById('mBuy').href = buildTcgplayerUrl(c);
+  // CHANGED 2026-09-16 per Jordan: "replace the find on find on
+  // pricecharting button with a find on ebay button that had the same
+  // behavior as the psa10 button" -- same element/id, now a general eBay
+  // search (buildEbayUrl) instead of PriceCharting, opened the same way
+  // (target="_blank") the old PSA10 link was.
   const mBuyEbay = document.getElementById('mBuyEbay');
-  if (mBuyEbay) mBuyEbay.href = buildPriceChartingUrl(c);
+  if (mBuyEbay) mBuyEbay.href = buildEbayUrl(c);
 
   const ownBtn = document.getElementById('mOwn');
   const owned = isOwned(c);

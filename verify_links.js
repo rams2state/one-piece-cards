@@ -9,27 +9,16 @@ function buildTcgplayerUrl(c) {
   return `https://www.tcgplayer.com/search/one-piece-card-game/product?q=${q}&view=grid`;
 }
 
-// PriceCharting: name + set name, with "Parallel"/"Special" appended as a
-// separate descriptive token (rather than the parenthetical the raw Card
-// Name sometimes carries) when applicable — PriceCharting's own listings
-// tend to use these as standalone words.
-function buildPriceChartingUrl(c) {
+// eBay: general search for this card (raw and graded listings both show
+// up) — replaces the old PriceCharting button. ADDED 2026-09-16 per
+// Jordan, mirroring the same button swap already made in the Pokémon
+// app. Query shape reused from the old PSA-10-specific builder (name +
+// set + Parallel/Special tokens) minus the "PSA 10" keyword, since this
+// is a general search now, not graded-only.
+function buildEbayUrl(c) {
   const parts = [c.name || '', c.set || ''];
   if (c.isParallel) parts.push('Parallel');
   if (c.isSpecial) parts.push('Special');
-  const q = parts.filter(Boolean).join(' ');
-  const params = new URLSearchParams({ q, type: 'prices' });
-  return `https://www.pricecharting.com/search-products?${params.toString()}`;
-}
-
-// eBay PSA-10: always available regardless of whether we have a PSA10 price
-// on file (we don't, for this dataset) — clicking opens a live eBay search
-// for graded PSA 10 copies of this exact card.
-function buildEbayPsa10Url(c) {
-  const parts = [c.name || '', c.set || ''];
-  if (c.isParallel) parts.push('Parallel');
-  if (c.isSpecial) parts.push('Special');
-  parts.push('PSA 10');
   const q = parts.filter(Boolean).join(' ');
   const params = new URLSearchParams({
     _nkw: q,
