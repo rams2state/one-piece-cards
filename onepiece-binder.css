@@ -913,3 +913,33 @@
 
     footer{font-size:11px;padding:16px;}
   }
+
+  /* ── ADDED 2026-10-13: English / Japanese switch ─────────────────────── */
+  .lang-toggle{
+    display:flex;width:fit-content;gap:0;margin:14px 0 0;padding:3px;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  }
+  .lang-btn{
+    font-family:'Manrope',sans-serif;font-weight:700;font-size:13px;letter-spacing:.02em;
+    color:var(--dim);background:transparent;border:0;border-radius:999px;
+    padding:7px 16px;cursor:pointer;transition:background .15s,color .15s;
+    min-height:34px;
+  }
+  .lang-btn:hover{color:var(--text);}
+  .lang-btn.active{background:var(--gold);color:#fff;}
+  .lang-btn:focus-visible{outline:2px solid var(--gold-bright);outline-offset:2px;}
+
+  /* Japan-market price line (Yuyu-tei, converted to USD) under the US price */
+  .jp-market{
+    display:block;font-size:10.5px;font-weight:700;color:#9fb8ff;
+    text-align:right;white-space:nowrap;letter-spacing:.01em;margin-top:1px;
+  }
+  .jp-market--tile{text-align:left;margin-top:3px;}
+  .modal-price-src{font-size:11px;color:var(--dim);font-weight:600;margin-top:4px;}
+  .modal-jp-market{font-size:15px;font-weight:700;color:#9fb8ff;margin-top:6px;}
+  .modal-jp-market .jp-yen{font-size:12px;color:var(--dim);font-weight:600;}
+  .jp-gap{
+    display:inline-block;font-size:11px;font-weight:800;color:var(--green);
+    background:#4ade8014;border:1px solid #4ade8040;border-radius:6px;padding:1px 6px;margin-left:4px;
+  }
+  .jp-gap--neg{color:#f87171;background:#f8717114;border-color:#f8717140;}

@@ -8,7 +8,7 @@
      belt-and-suspenders origin referrer policy is kept for consistency and
      in case that changes. -->
 <meta name="referrer" content="origin">
-<title>One Piece Rarity Binder — Chase Cards Across Every Set</title>
+<title>One Piece Rarity Binder — Chase Cards, English &amp; Japanese</title>
 <script>
 // Kill all service workers — they cause stale CSV caching issues
 if ('serviceWorker' in navigator) {
@@ -21,18 +21,13 @@ if ('serviceWorker' in navigator) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OP Binder">
-<!-- FAVICON/HOME-SCREEN ICON (2026-09-07, per Jordan): the Straw Hat Jolly
-     Roger flag, hotlinked from mystickermania.com -- same architecture as
-     every card image in this app (referenced by URL, never downloaded/
-     mirrored into the repo). If that URL ever goes down or moves, this
-     icon breaks and needs a new source; nothing else in the app depends
-     on it. rel="icon" covers the browser tab; apple-touch-icon covers
-     "Add to Home Screen" on iPhone (Jordan's second ask). -->
+<!-- Straw hat / Jolly Roger style SVG favicon inline via data URI (red/black) -->
 <link rel="icon" type="image/png" href="https://mystickermania.com/cdn/stickers/one-piece/one-piece-straw-pirates-flag-512x512.png">
 <link rel="apple-touch-icon" href="https://mystickermania.com/cdn/stickers/one-piece/one-piece-straw-pirates-flag-512x512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Luckiest+Guy&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Chart.js is now loaded on demand the first time a card is opened (modal.js). -->
+<link rel="preconnect" href="https://optcgapi.com">
 <link rel="stylesheet" href="onepiece-binder.css">
 
 </head>
@@ -48,6 +43,10 @@ if ('serviceWorker' in navigator) {
     <div class="read-only-row" id="readOnlyRow" style="display:none;">
       <span class="app-version app-version-readonly" id="appVersionReadOnly"></span>
       <div id="readOnlyBanner" class="read-only-banner">👁 Viewing a shared collection (read-only)</div>
+    </div>
+    <div class="lang-toggle" role="group" aria-label="Card language">
+      <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="true">🇺🇸 English</button>
+      <button type="button" class="lang-btn" data-lang-btn="jp" aria-pressed="false">🇯🇵 Japanese</button>
     </div>
     <div class="stats-row" id="statsRow">
       <div class="stat" id="statCardsBox"><div class="n" id="statCards">—</div><div class="l">Total Cards</div></div>
@@ -122,17 +121,8 @@ if ('serviceWorker' in navigator) {
   </div>
 
   <div id="noDataState">
-    <div class="display">No CSV Loaded</div>
-    <p>Drop <em>ONE_PIECE_COLLECTION.csv</em> below to load your collection.</p>
-    <div class="upload-zone" id="dropZone">
-      <label for="csvFile">
-        <div style="font-size:32px;margin-bottom:8px;">📂</div>
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">Drop CSV here</div>
-        <div style="font-size:13px;color:var(--dim);">or click to browse</div>
-        <div class="upload-btn">Choose CSV File</div>
-      </label>
-      <input type="file" id="csvFile" accept=".csv">
-    </div>
+    <div class="display">No Data Yet</div>
+    <p id="noDataMsg">Card data couldn't be loaded.</p>
   </div>
 
   <div id="cardView" style="display:none;"></div>
@@ -169,7 +159,8 @@ if ('serviceWorker' in navigator) {
       <div class="modal-actions">
         <button class="modal-own" id="mOwn" onclick="toggleFromModal()">＋ Mark as Owned</button>
         <a class="modal-buy" id="mBuy" href="#" target="_blank" rel="noopener">Find on TCGplayer →</a>
-        <a class="modal-buy modal-buy--pricecharting" id="mBuyEbay" href="#" target="_blank" rel="noopener">Find on PriceCharting →</a>
+        <a class="modal-buy modal-buy--pricecharting" id="mBuyEbay" href="#" target="_blank" rel="noopener">Find on eBay →</a>
+        <a class="modal-buy modal-buy--pricecharting" id="mBuyYuyu" href="#" target="_blank" rel="noopener" style="display:none;">Yuyu-tei (JP) →</a>
       </div>
       <div class="modal-purchase-prompt" id="mPurchasePrompt" style="display:none;">
         <label for="mPurchaseInput">What did you pay?</label>
@@ -184,7 +175,7 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-<footer>One Piece TCG Rarity Binder · Data from optcgapi.com &amp; TCGplayer</footer>
+<footer>One Piece TCG Rarity Binder · <span id="footerSrc">Data from optcgapi.com &amp; TCGplayer</span></footer>
 
 <!-- Firebase SDK -->
 <script type="module" src="firebase.js"></script>

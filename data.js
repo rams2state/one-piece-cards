@@ -1,97 +1,45 @@
-// data.js — CSV parsing, card normalization, owned-card storage, and the
+// data.js — data loading, card normalization, owned-card storage, and the
 // small set of cross-cutting globals every other file reads/writes.
-// Mirrors the Pokémon app's (unshipped in this handoff, but referenced by
-// every other file) data.js: normalizeCard(), parseCSV(), ALL_CARDS,
-// currentView, showOwnedOnly, PRICE_HISTORY, READ_ONLY_SHARE, cardKey(),
-// isOwned()/toggleOwned(), ownedAddedAt()/ownedPurchasePrice()/setPurchasePrice(),
-// daysSince()/formatDateDisplay(), APP_VERSION, updateCollectionValue().
+//
+// REBUILT 2026-10-13: the app now reads compact JSON (data/cards-en.json,
+// data/cards-jp.json) written by the collector, instead of parsing the
+// full 565 KB CSV + 490 KB price history on every visit. Set order also
+// comes from the data file now, so a new set (EB-05, OP-18, ...) shows up
+// in the right place without editing this file. See site_data.py on the
+// collector side for the file format.
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '2.0.0';
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 let ALL_CARDS = [];
-let currentView = 'list'; // 'list' | 'grid'
+let CARD_BY_KEY = new Map();    // cardKey -> card, for click handling
+let SET_ORDER = [];             // set IDs in display order (from the data file)
+let currentView = 'list';       // 'list' | 'grid'
 let showOwnedOnly = false;
-let PRICE_HISTORY = {};
+let DATA_META = {};             // { generated, fx, ... } from the loaded file
 const READ_ONLY_SHARE = !!(new URLSearchParams(window.location.search).get('share'));
+
+// ─── LANGUAGE (EN / JP) ──────────────────────────────────────────────────────
+const LANG_KEY = 'onepiece-binder-lang';
+let LANG = (() => {
+  const q = new URLSearchParams(window.location.search).get('lang');
+  if (q === 'jp' || q === 'en') return q;
+  try { return localStorage.getItem(LANG_KEY) === 'jp' ? 'jp' : 'en'; } catch (e) { return 'en'; }
+})();
+function isJP() { return LANG === 'jp'; }
 
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
-// ─── SET ORDER (chronological-as-best-effort) ───────────────────────────────
-// Main Sets: OP-01..OP-17 in numeric order, with Extra Boosters and Premium
-// Boosters interspersed roughly where they released, and the hybrid
-// OP14-EB04/OP15-EB04 sets near OP-14/OP-15's release window.
-const MAIN_SET_ORDER = [
-  'OP-01', 'OP-02', 'EB-01', 'OP-03', 'OP-04', 'OP-05', 'OP-06', 'EB-02',
-  'OP-07', 'OP-08', 'OP-09', 'OP-10', 'EB-03', 'OP-11', 'OP-12', 'OP-13',
-  'OP14-EB04', 'OP15-EB04', 'PRB-01', 'OP-16', 'OP-17', 'PRB-02',
-];
-const STARTER_SET_ORDER = [
-  'ST-01','ST-02','ST-03','ST-04','ST-05','ST-06','ST-07','ST-08','ST-09','ST-10',
-  'ST-11','ST-12','ST-13','ST-14','ST-15','ST-16','ST-17','ST-18','ST-19','ST-20',
-  'ST-21','ST-22','ST-23','ST-24','ST-25','ST-26','ST-27','ST-28','ST-29','ST-30',
-  'ST-31','ST-32','ST-33','ST-34','ST-35','ST-36',
-];
 function isStarterSet(setId) { return /^ST-/.test(setId || ''); }
 function setSortIndex(setId) {
-  const mi = MAIN_SET_ORDER.indexOf(setId);
-  if (mi !== -1) return mi;
-  const si = STARTER_SET_ORDER.indexOf(setId);
-  if (si !== -1) return 1000 + si;
-  return 9999;
-}
-
-// ─── CSV PARSING (RFC4180-ish, handles quoted fields with embedded commas,
-// quotes, and newlines — the CSV has both, e.g. Kid's name has embedded
-// quotes and Card Text has commas/newlines) ──────────────────────────────────
-function parseCSV(text) {
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-  // Normalize line endings up front so \r\n inside quoted fields doesn't
-  // trip the parser.
-  const s = text.replace(/\r\n/g, '\n');
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (s[i + 1] === '"') { field += '"'; i++; }
-        else { inQuotes = false; }
-      } else {
-        field += c;
-      }
-    } else {
-      if (c === '"') {
-        inQuotes = true;
-      } else if (c === ',') {
-        row.push(field); field = '';
-      } else if (c === '\n') {
-        row.push(field); field = '';
-        rows.push(row); row = [];
-      } else {
-        field += c;
-      }
-    }
-  }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
-  if (rows.length === 0) return [];
-  const header = rows[0].map(h => h.trim());
-  const out = [];
-  for (let r = 1; r < rows.length; r++) {
-    const cells = rows[r];
-    if (cells.length === 1 && cells[0].trim() === '') continue; // blank line
-    const obj = {};
-    for (let c = 0; c < header.length; c++) obj[header[c]] = (cells[c] || '').trim();
-    out.push(obj);
-  }
-  return out;
+  const i = SET_ORDER.indexOf(setId);
+  return i === -1 ? 9999 : i;
 }
 
 // ─── CARD NORMALIZATION ──────────────────────────────────────────────────────
-// Strips the "(Parallel)"/"(SP)" markers some Card Names have, so display
-// names, TCGplayer/PriceCharting/eBay queries all work off a clean base name
-// while still knowing (via isParallel/isSpecial) that the marker applied.
+// Strips the "(Parallel)"/"(SP)" markers some English card names have, so
+// display names and store searches work off a clean base name while still
+// knowing (via isSpecial) that the marker applied.
 function stripNameMarkers(name) {
   return (name || '')
     .replace(/\s*\(Parallel\)\s*/gi, ' ')
@@ -99,75 +47,120 @@ function stripNameMarkers(name) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+function fmtPrice(v) { return v != null && v > 0 ? `$${v.toFixed(2)}` : 'N/A'; }
 
-function normalizeCard(raw) {
-  const cardId = raw['Card ID'] || '';
-  const rawName = raw['Card Name'] || '';
-  const isSpecial = /\(SP\)/i.test(rawName);
-  const isParallelFlag = (raw['Is Parallel'] || '').trim().toLowerCase() === 'yes';
-  const cleanName = stripNameMarkers(rawName);
-  const marketPrice = parseFloat(raw['Market Price']);
-  const price = !isNaN(marketPrice) && marketPrice > 0 ? `$${marketPrice.toFixed(2)}` : 'N/A';
-  const invPrice = parseFloat(raw['Inventory Price']);
-
+function normalizeEn(r, setNames, imgBase) {
+  const rawName = r.name || '';
   return {
-    cardId,
-    name: cleanName,
+    lang: 'en',
+    cardId: r.id,
+    name: stripNameMarkers(rawName),
     rawName,
-    isSpecial,
-    isParallel: isParallelFlag,
-    setId: raw['Set ID'] || '',
-    set: raw['Set Name'] || '',
-    rarity: raw['Rarity'] || '',
-    color: raw['Color'] || '',
-    cardType: raw['Type'] || '',
-    cost: raw['Cost'] || '',
-    power: raw['Power'] || '',
-    life: raw['Life'] || '',
-    counter: raw['Counter'] || '',
-    attribute: raw['Attribute'] || '',
-    subTypes: raw['Sub Types'] || '',
-    text: raw['Card Text'] || '',
-    pic: raw['Image URL'] || raw['Picture URL'] || '',
-    price,
-    priceVal: !isNaN(marketPrice) ? marketPrice : 0,
-    invPrice: !isNaN(invPrice) ? invPrice : null,
-    lastPriced: raw['Last Priced'] || '',
+    isSpecial: /\(SP\)/i.test(rawName),
+    isParallel: !!r.parallel,
+    setId: r.setId,
+    set: setNames[r.setId] || r.setId,
+    rarity: r.rarity || '',
+    color: r.color || '',
+    cardType: r.type || '',
+    pic: r.img ? (/^https?:/.test(r.img) ? r.img : imgBase + r.img) : '',
+    price: fmtPrice(r.price),
+    priceVal: r.price || 0,
+    p7: r.p7,
+    lastPriced: r.lastPriced || '',
   };
 }
 
+// Japanese cards: name carries the print label in brackets
+// ("Shanks [Manga]"); "num" is the card number plus a print suffix
+// (_p1 alt, _p2 super alt, _p3 manga, _p4 SP, _p5 TR, _p6 Pandaman) so the
+// same sorting/print-badge logic as English works unchanged.
+function normalizeJp(r, setNames, imgBase, fx) {
+  const rawName = r.name || '';
+  const jpyUsd = r.jpy && fx ? r.jpy * fx : null;
+  return {
+    lang: 'jp',
+    uid: r.id,
+    cardId: r.num || r.id,
+    name: rawName.replace(/\s*\[[^\]]+\]\s*$/, ''),
+    rawName,
+    variant: r.variant || '',
+    isSpecial: r.variant === 'sp',
+    isParallel: !!r.variant && r.variant !== 'base' && r.variant !== 'don',
+    setId: r.setId,
+    set: setNames[r.setId] || r.setId,
+    rarity: r.rarity || '',
+    color: '',
+    cardType: '',
+    pic: r.img ? `${imgBase}${r.img}/240.jpg` : '',
+    picLarge: r.img ? `${imgBase}${r.img}/1600.jpg` : '',
+    price: fmtPrice(r.price),
+    priceVal: r.price || 0,
+    p7: r.p7,
+    lastPriced: r.lastPriced || '',
+    jpy: r.jpy || null,
+    jpyUsd,
+    pcPath: r.pc || '',
+    yyPath: r.yy || '',
+  };
+}
+
+function normalizeDataFile(d) {
+  const fields = d.fields;
+  const setNames = {};
+  for (const s of d.sets || []) setNames[s.id] = s.name;
+  SET_ORDER = (d.sets || []).map(s => s.id);
+  DATA_META = { generated: d.generated, fx: d.fx, lang: d.lang };
+  const out = [];
+  for (const row of d.cards) {
+    const r = {};
+    for (let i = 0; i < fields.length; i++) r[fields[i]] = row[i];
+    out.push(d.lang === 'jp' ? normalizeJp(r, setNames, d.imgBase, d.fx) : normalizeEn(r, setNames, d.imgBase));
+  }
+  return out;
+}
+
 // ─── OWNED-CARD STORAGE (localStorage-first, event-driven Firestore sync) ───
-// Storage shape: { [cardId]: { addedAt: <ms>, purchasePrice?: <number> } }
+// Storage shape: { [cardKey]: { addedAt: <ms>, purchasePrice?: <number> } }
+// English keys are the plain card ID (unchanged from v1, so existing owned
+// lists carry over). Japanese keys are "JP-<id>", so both live in the same
+// synced map without ever colliding.
 const OWNED_KEY = 'onepiece-rarity-binder-owned';
+let _ownedCache = null;
 
 function getOwnedMap() {
-  try { return JSON.parse(localStorage.getItem(OWNED_KEY) || '{}'); }
-  catch (e) { return {}; }
+  if (_ownedCache) return _ownedCache;
+  try { _ownedCache = JSON.parse(localStorage.getItem(OWNED_KEY) || '{}'); }
+  catch (e) { _ownedCache = {}; }
+  return _ownedCache;
 }
 function saveOwnedMap(map) {
+  _ownedCache = map;
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(map)); } catch (e) {}
 }
-function cardKey(c) { return c.cardId || `${c.name}_${c.set}`; }
+// firebase.js writes localStorage directly when a remote change arrives.
+window.invalidateOwnedCache = function() { _ownedCache = null; };
+window.addEventListener('storage', e => { if (e.key === OWNED_KEY) _ownedCache = null; });
 
-function isOwned(c) {
-  const map = getOwnedMap();
-  return !!map[cardKey(c)];
+function cardKey(c) {
+  if (c.lang === 'jp') return 'JP-' + c.uid;
+  return c.cardId || `${c.name}_${c.set}`;
 }
+function domKey(c) { return cardKey(c).replace(/[^a-z0-9]/gi, '_'); }
+
+function isOwned(c) { return !!getOwnedMap()[cardKey(c)]; }
 function ownedAddedAt(c) {
-  const map = getOwnedMap();
-  const e = map[cardKey(c)];
+  const e = getOwnedMap()[cardKey(c)];
   return e && e.addedAt ? e.addedAt : 0;
 }
 function ownedPurchasePrice(c) {
-  const map = getOwnedMap();
-  const e = map[cardKey(c)];
+  const e = getOwnedMap()[cardKey(c)];
   return e && typeof e.purchasePrice === 'number' ? e.purchasePrice : null;
 }
 function setPurchasePrice(c, val) {
-  const map = getOwnedMap();
+  const map = { ...getOwnedMap() };
   const key = cardKey(c);
-  if (!map[key]) map[key] = { addedAt: Date.now() };
-  map[key].purchasePrice = val;
+  map[key] = { ...(map[key] || { addedAt: Date.now() }), purchasePrice: val };
   saveOwnedMap(map);
   window.dispatchEvent(new CustomEvent('owned-changed', {
     detail: { key, action: 'add', meta: map[key] }
@@ -178,32 +171,22 @@ function setPurchasePrice(c, val) {
 // show the purchase-price prompt only on a genuine new add, never on remove).
 function toggleOwned(c) {
   if (READ_ONLY_SHARE) return false;
-  const map = getOwnedMap();
+  const map = { ...getOwnedMap() };
   const key = cardKey(c);
-  if (map[key]) {
-    delete map[key];
-    saveOwnedMap(map);
-    updateCollectionValue();
-    window.dispatchEvent(new CustomEvent('owned-changed', {
-      detail: { key, action: 'remove', meta: null }
-    }));
-    return false;
-  } else {
-    const meta = { addedAt: Date.now() };
-    map[key] = meta;
-    saveOwnedMap(map);
-    updateCollectionValue();
-    window.dispatchEvent(new CustomEvent('owned-changed', {
-      detail: { key, action: 'add', meta }
-    }));
-    return true;
-  }
+  const adding = !map[key];
+  let meta = null;
+  if (adding) { meta = { addedAt: Date.now() }; map[key] = meta; }
+  else delete map[key];
+  saveOwnedMap(map);
+  updateCollectionValue();
+  window.dispatchEvent(new CustomEvent('owned-changed', {
+    detail: { key, action: adding ? 'add' : 'remove', meta }
+  }));
+  return adding;
 }
 
 // Used by firebase.js's read-only share view to apply someone else's owned
-// data directly (bypasses localStorage entirely — this is a visitor viewing
-// someone ELSE's collection).
-let _sharedOwnedMap = null;
+// data directly (a visitor viewing someone ELSE's collection).
 function normalizeOwnedData(raw) {
   if (Array.isArray(raw)) {
     const now = Date.now();
@@ -214,8 +197,7 @@ function normalizeOwnedData(raw) {
   return raw && typeof raw === 'object' ? raw : {};
 }
 window.setSharedOwned = function(raw) {
-  _sharedOwnedMap = normalizeOwnedData(raw);
-  saveOwnedMap(_sharedOwnedMap);
+  saveOwnedMap(normalizeOwnedData(raw));
   updateCollectionValue();
   if (typeof render === 'function') render();
 };
@@ -231,10 +213,7 @@ function updateCollectionValue() {
   const map = getOwnedMap();
   let count = 0, value = 0;
   for (const c of ALL_CARDS) {
-    if (map[cardKey(c)]) {
-      count++;
-      value += c.priceVal || 0;
-    }
+    if (map[cardKey(c)]) { count++; value += c.priceVal || 0; }
   }
   const ownedEl = document.getElementById('statOwned');
   const valEl = document.getElementById('statValue');
@@ -256,4 +235,7 @@ function formatDateDisplay(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }

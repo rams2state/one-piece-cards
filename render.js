@@ -1,12 +1,17 @@
 // render.js — set overview, set-detail drill-down (history-based back
-// navigation), list/grid rendering, filtering/sorting. Mirrors Pokémon's
-// render.js structure; adapted for One Piece's flat rarity space and its
-// two-section overview (Main Sets vs Starter Decks) instead of Pokémon's
-// era-grouped overview.
+// navigation), list/grid rendering, filtering/sorting.
+//
+// REBUILT 2026-10-13 for speed: every row and tile used to carry TWO full
+// JSON copies of its card inside inline onclick='...' attributes (several
+// MB of HTML for ~1,300 cards, re-parsed on every click). Rows now carry
+// only a short data-key; one delegated click listener on #cardView looks
+// the card up in CARD_BY_KEY. Same markup/classes otherwise, so the look
+// is unchanged.
 
 // ─── LOAD DATA ───────────────────────────────────────────────────────────────
-function loadCards(rawCards) {
-  ALL_CARDS = rawCards.map(normalizeCard).filter(c => c.setId || c.name);
+function loadCards(cards) {
+  ALL_CARDS = cards.filter(c => c.setId || c.name);
+  CARD_BY_KEY = new Map(ALL_CARDS.map(c => [domKey(c), c]));
   updateStats();
   populateFilters();
   document.getElementById('toolbar').style.display = '';
@@ -19,7 +24,7 @@ function loadCards(rawCards) {
     if (!showOwnedOnly) toggleOwnedFilter();
     setView('grid');
   } else {
-    setView('list');
+    setView(currentView || 'list');
   }
 }
 
@@ -41,13 +46,27 @@ function populateFilters() {
   const rarities = [...new Set(ALL_CARDS.map(c => c.rarity).filter(Boolean))]
     .sort((a, b) => rarityRank(a) - rarityRank(b));
   const rarEl = document.getElementById('rarityFilter');
+  const prevRar = rarEl.value;
   rarEl.innerHTML = '<option value="">All Rarities</option>' +
-    rarities.map(r => `<option value="${r}">${RARITY_DISPLAY[r] || r}</option>`).join('');
+    rarities.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(RARITY_DISPLAY[r] || r)}</option>`).join('');
+  rarEl.value = rarities.includes(prevRar) ? prevRar : '';
 
-  const colors = [...new Set(ALL_CARDS.map(c => c.color).filter(Boolean))].sort();
+  // Colors only exist in the English data; the Japanese side uses this
+  // same dropdown as a "print type" filter instead.
   const colorEl = document.getElementById('eraFilter'); // reused select — "colorFilter" role
-  colorEl.innerHTML = '<option value="">All Colors</option>' +
-    colors.map(cl => `<option value="${cl}">${cl}</option>`).join('');
+  if (isJP()) {
+    const order = ['base', 'alt', 'superalt', 'manga', 'sp', 'tr', 'pandaman', 'don', 'other'];
+    const label = { base: 'Regular print', alt: 'Alt Art', superalt: 'Super Alt Art', manga: 'Manga',
+                    sp: 'SP', tr: 'TR', pandaman: 'Pandaman', don: 'DON!!', other: 'Other' };
+    const present = new Set(ALL_CARDS.map(c => c.variant));
+    colorEl.innerHTML = '<option value="">All Prints</option>' +
+      order.filter(v => present.has(v)).map(v => `<option value="${v}">${label[v]}</option>`).join('');
+  } else {
+    const colors = [...new Set(ALL_CARDS.map(c => c.color).filter(Boolean))].sort();
+    colorEl.innerHTML = '<option value="">All Colors</option>' +
+      colors.map(cl => `<option value="${escapeHtml(cl)}">${escapeHtml(cl)}</option>`).join('');
+  }
+  colorEl.value = '';
   syncMobileFilters();
 }
 
@@ -108,29 +127,24 @@ function resetFilters() {
 const normalizeSearchText = s => (s || '').toLowerCase();
 
 function getFiltered() {
-  const q = normalizeSearchText(document.getElementById('search').value);
-  const color = document.getElementById('eraFilter').value;
+  const q = normalizeSearchText(document.getElementById('search').value.trim());
+  const colorOrPrint = document.getElementById('eraFilter').value;
   const rarity = document.getElementById('rarityFilter').value;
   const sort = document.getElementById('sortBy').value;
+  const owned = showOwnedOnly ? getOwnedMap() : null;
 
   let cards = ALL_CARDS.filter(c => {
-    if (showOwnedOnly && !isOwned(c)) return false;
-    if (color && c.color !== color) return false;
+    if (owned && !owned[cardKey(c)]) return false;
+    if (colorOrPrint && (isJP() ? c.variant : c.color) !== colorOrPrint) return false;
     if (rarity && c.rarity !== rarity) return false;
     if (q) {
-      const haystack = normalizeSearchText(`${c.name} ${c.set} ${c.rarity} ${c.cardType}`);
-      if (!haystack.includes(q)) return false;
+      if (!c._hay) c._hay = normalizeSearchText(`${c.rawName || c.name} ${c.set} ${c.setId} ${c.rarity} ${c.cardType} ${c.cardId}`);
+      if (!c._hay.includes(q)) return false;
     }
     return true;
   });
 
   const setGroupKey = c => c.setId || '';
-
-  // Uses the same cardNumSort() as set-detail (see its definition below for
-  // why: same-number prints -- base/parallel/alt-art/manga/reprint -- need
-  // a deterministic tie-break, not just a raw number compare, so an
-  // alt-art print doesn't drift to an unpredictable spot relative to its
-  // base print across reloads.
   cards.sort((a, b) => {
     if (sort === 'date-asc') {
       return setSortIndex(a.setId) - setSortIndex(b.setId)
@@ -150,16 +164,14 @@ function getFiltered() {
       if (bv < 0) return -1;
       return av - bv;
     }
-    if (sort === 'recent-purchase') {
-      return ownedAddedAt(b) - ownedAddedAt(a);
-    }
+    if (sort === 'recent-purchase') return ownedAddedAt(b) - ownedAddedAt(a);
     return 0;
   });
 
   return cards;
 }
 
-let _activeSet = null; // { set } or null — "set" is the Set ID
+let _activeSet = null; // { setId } or null
 let _trendMode = null;
 
 function toggleNow() {
@@ -210,19 +222,9 @@ function setTrend(mode) {
   render();
 }
 
-// FIXED 2026-09-06: cardNumSort used to sort purely by the numeric card
-// number (e.g. "120" from "OP01-120"), which put every print of the same
-// card -- base, parallel, alt-art, manga, reprint -- at the exact same
-// sort key. Array.sort() isn't guaranteed stable across engines for a
-// tie, so an alt-art print (like OP01-120_p2, "Shanks (Manga) (Alternate
-// Art)", $1,532.80) could land ANYWHERE relative to its base print with
-// no visual cue explaining why -- caught 2026-09-06 when Jordan couldn't
-// find that alt-art in the set view even though it was correctly in the
-// CSV the whole time. Now sorts same-number prints deterministically:
-// base print first, then by suffix (_p1, _p2, _r1, ...) in order, so
-// every print of a card is grouped together and always in the same order
-// on every load. Hoisted to module scope (was nested in renderSetDetail)
-// so renderTrend/renderFlatList can use the matching printBadge() below.
+// Same-number prints (base, parallel, alt-art, manga, reprint) sort
+// deterministically: base first, then by suffix (_p1, _p2, _r1...), so
+// every print of a card is grouped and always in the same order.
 function cardNumSort(a, b) {
   const parse = id => { const m = (id || '').match(/-(\d+)/); return m ? parseInt(m[1], 10) : 0; };
   const numA = parse(a.cardId), numB = parse(b.cardId);
@@ -230,17 +232,21 @@ function cardNumSort(a, b) {
   const suffix = id => { const m = (id || '').match(/_(p|r)(\d+)$/i); return m ? [m[1].toLowerCase(), parseInt(m[2], 10)] : ['', 0]; };
   const [typeA, ordA] = suffix(a.cardId);
   const [typeB, ordB] = suffix(b.cardId);
-  if (typeA !== typeB) return typeA.localeCompare(typeB); // '' (base) sorts before 'p'/'r'
-  return ordA - ordB;
+  if (typeA !== typeB) return typeA.localeCompare(typeB);
+  if (ordA !== ordB) return ordA - ordB;
+  return (a.rawName || '').localeCompare(b.rawName || '');
 }
 
-// Short, unambiguous print-variant label for a list row -- replaces the
-// old bare "_p1"/"_p2" suffix on the number badge (which read as
-// meaningless noise, not as "this is a different, much rarer print").
+// Short print-variant label for a row ("Alt Art", "Manga", ...).
 function printBadge(c) {
+  if (c.lang === 'jp') {
+    return { alt: 'Alt Art', superalt: 'Super Alt', manga: 'Manga', sp: 'SP', tr: 'TR',
+             pandaman: 'Pandaman', other: 'Special' }[c.variant] || '';
+  }
   const m = (c.cardId || '').match(/_(p|r)(\d+)$/i);
   if (!m) return '';
   const name = c.rawName || c.name || '';
+  if (/super alternate|super leader/i.test(name)) return 'Super Alt';
   if (/manga/i.test(name)) return 'Manga';
   if (/alternate art/i.test(name)) return 'Alt Art';
   if (/reprint/i.test(name)) return 'Reprint';
@@ -248,103 +254,142 @@ function printBadge(c) {
   return 'Parallel';
 }
 
+// ─── SHARED ROW / TILE MARKUP ────────────────────────────────────────────────
+function thumbHtml(c) {
+  return c.pic
+    ? `<img class="crow-thumb" src="${escapeHtml(c.pic)}" alt="" loading="lazy" decoding="async" referrerpolicy="origin" onerror="this.style.display='none'">`
+    : `<div class="crow-thumb-empty">?</div>`;
+}
+function badgeHtml(c) {
+  const b = printBadge(c);
+  return b ? `<span class="crow-print-badge">${b}</span>` : '';
+}
+function priceText(c) { return c.price !== 'N/A' ? c.price : '—'; }
+
+// "#022" for a card from the set being viewed; the full number for a
+// reprint from another set (e.g. an EB04 SP inside a Japanese OP-17 list).
+function shortNum(c) {
+  const num = (c.cardId || '').replace(/_(p|r)\d+$/i, '');
+  if (c.lang === 'jp' && !num.startsWith((c.setId || '').replace('-', ''))) return num;
+  return num.replace(/^[A-Z0-9]+-/, '#');
+}
+
+// opts: { rank, numCol, extraPriceHtml, showChange }
+function rowHtml(c, opts = {}) {
+  const owned = isOwned(c);
+  const key = domKey(c);
+  const mid = opts.numCol
+    ? `<span class="crow-num">${escapeHtml(shortNum(c))}</span>
+       <span class="crow-name">${escapeHtml(c.name || '—')}${badgeHtml(c)}</span>`
+    : `<div style="flex:1;min-width:0;">
+        <div class="crow-name">${escapeHtml(c.name || '—')}${badgeHtml(c)}</div>
+        <div class="crow-set">${escapeHtml(c.set)}</div>
+      </div>`;
+  return `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" data-key="${key}">
+      ${opts.rank ? `<span class="trend-rank">${opts.rank}</span>` : ''}
+      <div class="crow-check${owned ? ' owned' : ''}" data-act="own">${owned ? '✓' : ''}</div>
+      ${thumbHtml(c)}
+      ${mid}
+      <div class="crow-price-wrap">
+        <span class="crow-price">${priceText(c)}</span>${staleWarningIcon(c)}${opts.showChange ? priceChangeBadge(c) : ''}
+        ${opts.extraPriceHtml || ''}
+        ${jpMarketLine(c)}
+        ${seventyPercentBadgeHtml(c)}
+      </div>
+    </div>`;
+}
+
+function renderTileHtml(c) {
+  const owned = isOwned(c);
+  const key = domKey(c);
+  const imgTag = c.pic
+    ? `<img src="${escapeHtml(c.pic)}" alt="" loading="lazy" decoding="async" referrerpolicy="origin" onerror="this.style.background='var(--panel2)';this.removeAttribute('src')">`
+    : `<div style="aspect-ratio:2.5/3.5;background:var(--panel2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;">No Image</div>`;
+  return `<div class="card-tile${owned ? ' owned' : ''}" id="tile-${key}" data-key="${key}">
+      ${imgTag}
+      <div class="tile-check" data-act="own">${owned ? '✓' : ''}</div>
+      <div class="tile-info">
+        <div class="tile-name" title="${escapeHtml(c.name || '')}">${escapeHtml(c.name || '—')}${badgeHtml(c)}</div>
+        <div class="tile-set" title="${escapeHtml(c.set)}">${escapeHtml(c.set)}</div>
+        <div class="tile-footer">
+          <div class="tile-price-row"><span class="tile-price">${priceText(c)}</span>${staleWarningIcon(c)}${seventyPercentBadgeHtml(c)}${priceChangeBadge(c)}</div>
+          ${jpMarketLine(c, 'jp-market jp-market--tile')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// One listener for every row, tile, owned-check and set tile in the view.
+document.getElementById('cardView').addEventListener('click', e => {
+  const setTile = e.target.closest('[data-set]');
+  if (setTile) { openSetDetail(setTile.dataset.set); return; }
+  const host = e.target.closest('[data-key]');
+  if (!host) return;
+  const c = CARD_BY_KEY.get(host.dataset.key);
+  if (!c) return;
+  if (e.target.closest('[data-act="own"]')) handleToggle(c);
+  else openModal(c);
+});
+
+// ─── TREND (GAINERS / LOSERS) ────────────────────────────────────────────────
 function renderTrend(el) {
   const MIN_PRICE = 2.00;
-  const withChange = ALL_CARDS
-    .map(c => {
-      const cv = priceVal(c.price), pv = getPriceNDaysAgo(c.cardId, 7);
-      return { ...c, _pv7: pv, _cv: cv };
-    })
-    .filter(c => c._cv > 0 && c._pv7 !== null && c._pv7 > 0 && Math.max(c._cv, c._pv7) >= MIN_PRICE)
-    .map(c => {
-      const delta = c._cv - c._pv7;
-      const pct = (delta / c._pv7) * 100;
-      return { ...c, _delta: delta, _pct: pct, _pv: c._pv7 };
-    });
-
-  if (withChange.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="display">No price changes yet</div><p>Run the collector daily for at least 7 days to see price movement.</p></div>`;
-    return;
+  const withChange = [];
+  for (const c of getFiltered()) {
+    const cv = priceVal(c.price), pv = getPriceNDaysAgo(c);
+    if (cv > 0 && pv !== null && Math.max(cv, pv) >= MIN_PRICE) {
+      withChange.push({ c, delta: cv - pv, pct: (cv - pv) / pv * 100, pv });
+    }
   }
-
+  const emptyMsg = t => `<div class="empty"><div class="display">${t}</div><p>Prices need about a week of daily runs before movement shows up.</p></div>`;
+  if (withChange.length === 0) { el.innerHTML = emptyMsg('No price changes yet'); return; }
   const TOP_N = 25;
   let sorted, title, titleColor, subtitle;
   if (_trendMode === 'gainers') {
-    sorted = [...withChange].filter(c => c._delta > 0).sort((a, b) => b._delta - a._delta || b._pct - a._pct).slice(0, TOP_N);
+    sorted = withChange.filter(x => x.delta > 0).sort((a, b) => b.delta - a.delta || b.pct - a.pct).slice(0, TOP_N);
     title = '📈 Top Gainers'; titleColor = '#4ade80';
     subtitle = `Top ${sorted.length} biggest price increases (min $${MIN_PRICE} card)`;
   } else {
-    sorted = [...withChange].filter(c => c._delta < 0).sort((a, b) => a._delta - b._delta || a._pct - b._pct).slice(0, TOP_N);
+    sorted = withChange.filter(x => x.delta < 0).sort((a, b) => a.delta - b.delta || a.pct - b.pct).slice(0, TOP_N);
     title = '📉 Top Losers'; titleColor = '#f87171';
     subtitle = `Top ${sorted.length} biggest price decreases (min $${MIN_PRICE} card)`;
   }
-  if (sorted.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="display">${_trendMode === 'gainers' ? 'No gainers yet' : 'No losers yet'}</div><p>Run the collector daily for at least 7 days to see price movement.</p></div>`;
-    return;
-  }
+  if (sorted.length === 0) { el.innerHTML = emptyMsg(_trendMode === 'gainers' ? 'No gainers yet' : 'No losers yet'); return; }
+  _setDetailOrder = sorted.map(x => x.c);
   let html = `<div class="trend-section">
     <div class="trend-header">
       <div class="trend-title" style="color:${titleColor};">${title}</div>
       <div class="trend-sub">${subtitle}</div>
     </div>`;
-  sorted.forEach((c, i) => {
-    const owned = isOwned(c);
-    const cdata = JSON.stringify(c).replace(/'/g, '&#39;');
-    const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
-    const sign = c._delta >= 0 ? '+' : '';
-    const cls = c._delta >= 0 ? 'price-up' : 'price-down';
-    const arrow = c._delta >= 0 ? '↑' : '↓';
-    const badge = `<span class="price-change ${cls}"><span class="price-change-period">7D</span> ${arrow} ${sign}$${Math.abs(c._delta).toFixed(2)} (${sign}${c._pct.toFixed(1)}%)</span>`;
-    const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
-    const pBadgeHtml1 = printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : '';
-    html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
-      <span class="trend-rank">${i + 1}</span>
-      <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
-      ${thumbHtml}
-      <div style="flex:1;min-width:0;">
-        <div class="crow-name">${c.name || '—'}${pBadgeHtml1}</div>
-        <div class="crow-set">${c.set}</div>
-      </div>
-      <div class="crow-price-wrap">
-        <span class="crow-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}
-        <div style="font-size:10px;color:var(--dim);text-align:right;">was $${c._pv.toFixed(2)} (7d ago)</div>
-        ${badge}
-        ${seventyPercentBadgeHtml(c)}
-      </div>
-    </div>`;
+  sorted.forEach((x, i) => {
+    const sign = x.delta >= 0 ? '+' : '';
+    const cls = x.delta >= 0 ? 'price-up' : 'price-down';
+    const arrow = x.delta >= 0 ? '↑' : '↓';
+    const extra = `<div style="font-size:10px;color:var(--dim);text-align:right;">was $${x.pv.toFixed(2)} (7d ago)</div>
+      <span class="price-change ${cls}"><span class="price-change-period">7D</span> ${arrow} ${sign}$${Math.abs(x.delta).toFixed(2)} (${sign}${x.pct.toFixed(1)}%)</span>`;
+    html += rowHtml(x.c, { rank: i + 1, extraPriceHtml: extra });
   });
-  html += `</div>`;
-  el.innerHTML = html;
+  el.innerHTML = html + `</div>`;
+}
+
+// Long flat lists (e.g. "price high to low" over every card) are capped so
+// the page stays fast; search or filter to narrow further.
+const FLAT_CAP = 300;
+function capNote(total) {
+  return total > FLAT_CAP
+    ? `<div class="empty" style="padding:18px 0;"><p>Showing the top ${FLAT_CAP} of ${total}. Search or filter to narrow it down.</p></div>`
+    : '';
 }
 
 function renderFlatList(cards, el, title) {
+  _setDetailOrder = cards.slice(0, FLAT_CAP);
   let html = `<div class="trend-section">
     <div class="trend-header">
       <div class="trend-title">${title}</div>
       <div class="trend-sub">${cards.length} card${cards.length !== 1 ? 's' : ''}</div>
     </div>`;
-  cards.forEach((c, i) => {
-    const owned = isOwned(c);
-    const cdata = JSON.stringify(c).replace(/'/g, '&#39;');
-    const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
-    const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
-    const pBadgeHtml2 = printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : '';
-    html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
-      <span class="trend-rank">${i + 1}</span>
-      <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
-      ${thumbHtml}
-      <div style="flex:1;min-width:0;">
-        <div class="crow-name">${c.name || '—'}${pBadgeHtml2}</div>
-        <div class="crow-set">${c.set}</div>
-      </div>
-      <div class="crow-price-wrap">
-        <span class="crow-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}
-        ${seventyPercentBadgeHtml(c)}
-      </div>
-    </div>`;
-  });
-  html += `</div>`;
-  el.innerHTML = html;
+  _setDetailOrder.forEach((c, i) => { html += rowHtml(c, { rank: i + 1 }); });
+  el.innerHTML = html + capNote(cards.length) + `</div>`;
 }
 
 const FLAT_SORTS = new Set(['price-desc', 'price-asc', 'recent-purchase']);
@@ -363,9 +408,11 @@ function render() {
 }
 function _doRender() {
   _renderPending = false;
+  if (!ALL_CARDS.length) return;
   updateResetBtn();
-  const cards = getFiltered();
   const el = document.getElementById('cardView');
+  if (_trendMode && currentView !== 'grid') { _lastRenderedSet = null; renderTrend(el); return; }
+  const cards = getFiltered();
   if (cards.length === 0) {
     el.innerHTML = `<div class="empty"><div class="display">No cards found</div><p>Try adjusting your search or filters.</p></div>`;
     _activeSet = null;
@@ -374,33 +421,26 @@ function _doRender() {
   }
   if (currentView === 'grid') {
     _setDetailOrder = null;
+    _lastRenderedSet = null;
     if (_activeSet) {
       const gridCards = cards.filter(c => c.setId === _activeSet.setId);
-      _lastRenderedSet = null;
       renderGrid(gridCards.length > 0 ? gridCards : cards, el);
     } else {
       const q = document.getElementById('search').value.trim();
-      const colorSel = document.getElementById('eraFilter').value;
-      const raritySel = document.getElementById('rarityFilter').value;
-      const hasFilter = !!q || !!colorSel || !!raritySel || showOwnedOnly;
+      const hasFilter = !!q || !!document.getElementById('eraFilter').value ||
+        !!document.getElementById('rarityFilter').value || showOwnedOnly;
       if (!hasFilter) {
-        el.innerHTML = `<div class="empty"><div class="display">Search to explore</div><p>Type a card name, set, or color — or apply a filter — to see results in grid view.</p></div>`;
+        el.innerHTML = `<div class="empty"><div class="display">Search to explore</div><p>Type a card name, number or set — or apply a filter — to see results in grid view.</p></div>`;
       } else {
-        _lastRenderedSet = null;
         const sortValueGrid = document.getElementById('sortBy').value;
-        if (FLAT_SORTS.has(sortValueGrid)) {
-          renderGridFlat(cards, el, FLAT_SORT_TITLES[sortValueGrid]);
-        } else {
-          renderGrid(cards, el);
-        }
+        if (FLAT_SORTS.has(sortValueGrid)) renderGridFlat(cards, el, FLAT_SORT_TITLES[sortValueGrid]);
+        else renderGrid(cards, el);
       }
     }
     return;
   }
-  if (_trendMode) { _setDetailOrder = null; _lastRenderedSet = null; renderTrend(el); return; }
   const sortValue = document.getElementById('sortBy').value;
   if (FLAT_SORTS.has(sortValue) && !_activeSet) {
-    _setDetailOrder = null;
     _lastRenderedSet = null;
     renderFlatList(cards, el, FLAT_SORT_TITLES[sortValue]);
     return;
@@ -408,7 +448,7 @@ function _doRender() {
   if (_activeSet) {
     const setCards = cards.filter(c => c.setId === _activeSet.setId);
     if (setCards.length > 0) {
-      const setKey = _activeSet.setId;
+      const setKey = LANG + ':' + _activeSet.setId;
       if (_lastRenderedSet === setKey) {
         filterSetDetailInPlace(setCards);
       } else {
@@ -416,11 +456,8 @@ function _doRender() {
         renderSetDetail(setCards, el);
       }
       return;
-    } else {
-      _activeSet = null;
-      _lastRenderedSet = null;
-      _setDetailOrder = null;
     }
+    _activeSet = null;
   }
   _lastRenderedSet = null;
   _setDetailOrder = null;
@@ -428,11 +465,10 @@ function _doRender() {
 }
 
 function filterSetDetailInPlace(visibleCards) {
-  const visibleKeys = new Set(visibleCards.map(c => cardKey(c).replace(/[^a-z0-9]/gi, '_')));
+  const visibleKeys = new Set(visibleCards.map(domKey));
   const el = document.getElementById('cardView');
-  el.querySelectorAll('.card-row[id^="row-"]').forEach(row => {
-    const key = row.id.slice(4);
-    row.style.display = visibleKeys.has(key) ? '' : 'none';
+  el.querySelectorAll('.card-row[data-key]').forEach(row => {
+    row.style.display = visibleKeys.has(row.dataset.key) ? '' : 'none';
   });
   el.querySelectorAll('.rarity-group').forEach(group => {
     const hasVisible = [...group.querySelectorAll('.card-row')].some(r => r.style.display !== 'none');
@@ -440,8 +476,16 @@ function filterSetDetailInPlace(visibleCards) {
   });
 }
 
+// Re-applies owned checkmarks to whatever is on screen (used after a
+// remote sync changes the owned list).
+function refreshOwnedMarks() {
+  document.querySelectorAll('#cardView [data-key]').forEach(host => {
+    const c = CARD_BY_KEY.get(host.dataset.key);
+    if (c) markOwned(c);
+  });
+}
+
 // ─── SET GROUPING ────────────────────────────────────────────────────────────
-// bySet[setId] = { setName, cards: [] }
 function buildSetGroups(cards) {
   const bySet = {};
   const setOrder = [];
@@ -460,10 +504,9 @@ function rarityPillsForCards(cards) {
     const r = c.rarity || 'Unknown';
     counts[r] = (counts[r] || 0) + 1;
   }
-  const rarities = Object.keys(counts).sort((a, b) => rarityRank(a) - rarityRank(b));
-  return rarities.map(r => {
+  return Object.keys(counts).sort((a, b) => rarityRank(a) - rarityRank(b)).map(r => {
     const color = rarityColor(r);
-    return `<span class="set-ov-pill" style="background:${color}22;color:${color};">${counts[r]} ${r}</span>`;
+    return `<span class="set-ov-pill" style="background:${color}22;color:${color};">${counts[r]} ${escapeHtml(r)}</span>`;
   }).join('');
 }
 
@@ -484,34 +527,30 @@ function renderSetOverview(cards, el) {
     for (const sid of sets) {
       const data = bySet[sid];
       const setTotal = data.cards.length;
-      const pillsHtml = rarityPillsForCards(data.cards);
-      const sidEnc = encodeURIComponent(sid).replace(/'/g, '%27');
-      html += `<div class="set-ov-card" onclick="openSetDetail('${sidEnc}')">
+      html += `<div class="set-ov-card" data-set="${escapeHtml(sid)}">
         <div class="set-ov-top">
-          <span class="set-ov-code">${sid}</span>
+          <span class="set-ov-code">${escapeHtml(sid)}</span>
           <span class="set-ov-year"></span>
         </div>
         <div class="set-ov-name-row">
-          <div class="set-ov-name">${data.setName}</div>
+          <div class="set-ov-name">${escapeHtml(data.setName)}</div>
         </div>
         <div class="set-ov-total">${setTotal} card${setTotal !== 1 ? 's' : ''}</div>
-        <div class="set-ov-pills">${pillsHtml}</div>
+        <div class="set-ov-pills">${rarityPillsForCards(data.cards)}</div>
       </div>`;
     }
-    html += `</div></div>`;
-    return html;
+    return html + `</div></div>`;
   }
 
-  let html = renderSection('Main Sets', mainSets);
-  html += renderSection('Starter Decks', starterSets);
-  el.innerHTML = html;
+  el.innerHTML = renderSection(isJP() ? 'Japanese Sets' : 'Main Sets', mainSets) +
+                 renderSection('Starter Decks', starterSets);
 }
 
-function openSetDetail(sidEnc) {
+function openSetDetail(setId) {
   sessionStorage.setItem('overviewScroll', window.scrollY);
   history.pushState({ setDetail: true }, '');
   _lastRenderedSet = null;
-  _activeSet = { setId: decodeURIComponent(sidEnc) };
+  _activeSet = { setId };
   render();
   window.scrollTo(0, 0);
 }
@@ -519,22 +558,19 @@ function openSetDetail(sidEnc) {
 function renderSetDetail(cards, el) {
   const setId = _activeSet.setId;
   const setName = cards[0]?.set || setId;
-  const total = cards.length;
-
   const byRarity = {};
   for (const c of cards) {
     const r = c.rarity || 'Unknown';
-    if (!byRarity[r]) byRarity[r] = [];
-    byRarity[r].push(c);
+    (byRarity[r] = byRarity[r] || []).push(c);
   }
   const rarityOrder = Object.keys(byRarity).sort((a, b) => rarityRank(a) - rarityRank(b));
 
   let html = `<div class="set-detail-header">
     <button class="set-detail-back" onclick="history.back()">← All Sets</button>
     <div class="set-detail-info">
-      <div class="set-detail-era">${setId} · ${total} cards</div>
+      <div class="set-detail-era">${escapeHtml(setId)} · ${cards.length} cards</div>
       <div class="set-detail-name-row">
-        <div class="set-detail-name">${setName}</div>
+        <div class="set-detail-name">${escapeHtml(setName)}</div>
       </div>
     </div>
   </div>`;
@@ -542,33 +578,16 @@ function renderSetDetail(cards, el) {
   const onScreenOrder = [];
   for (const r of rarityOrder) {
     const rarCards = [...byRarity[r]].sort(cardNumSort);
-    const label = RARITY_DISPLAY[r] || r;
     const color = rarityColor(r);
     html += `<div class="rarity-group">
       <div class="rarity-group-header">
-        <span class="rarity-group-label" style="color:${color};">${label} (${r})</span>
+        <span class="rarity-group-label" style="color:${color};">${escapeHtml(RARITY_DISPLAY[r] || r)} (${escapeHtml(r)})</span>
         <span class="rarity-group-count">(${rarCards.length})</span>
       </div>
       <div class="detail-card-grid">`;
     for (const c of rarCards) {
       onScreenOrder.push(c);
-      const owned = isOwned(c);
-      const cdata = JSON.stringify(c).replace(/'/g, '&#39;');
-      const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
-      const changeBadge = priceChangeBadge(c.price, c.cardId);
-      const thumbHtml = c.pic ? `<img class="crow-thumb" src="${c.pic}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.display='none'">` : `<div class="crow-thumb-empty">?</div>`;
-      const pBadge = printBadge(c);
-      const pBadgeHtml = pBadge ? `<span class="crow-print-badge">${pBadge}</span>` : '';
-      html += `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" onclick='openModal(${cdata})'>
-        <div class="crow-check${owned ? ' owned' : ''}" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
-        ${thumbHtml}
-        <span class="crow-num">${(c.cardId || '').replace(/^[A-Z0-9]+-/, '#').replace(/_(p|r)\d+$/i, '')}</span>
-        <span class="crow-name">${c.name || '—'}${pBadgeHtml}</span>
-        <div class="crow-price-wrap">
-          <span class="crow-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}${changeBadge}
-          ${seventyPercentBadgeHtml(c)}
-        </div>
-      </div>`;
+      html += rowHtml(c, { numCol: true, showChange: true });
     }
     html += `</div></div>`;
   }
@@ -583,33 +602,8 @@ function renderGridFlat(cards, el, title) {
         <div class="era-count">${cards.length} card${cards.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="card-grid">`;
-  for (const c of cards) {
-    html += renderTileHtml(c);
-  }
-  html += `</div></div>`;
-  el.innerHTML = html;
-}
-
-function renderTileHtml(c) {
-  const owned = isOwned(c);
-  const cdata = JSON.stringify(c).replace(/'/g, '&#39;');
-  const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
-  const changeBadge = priceChangeBadge(c.price, c.cardId);
-  const imgSrc = c.pic || '';
-  const imgTag = imgSrc
-    ? `<img src="${imgSrc}" alt="${c.name || ''}" loading="lazy" referrerpolicy="origin" onerror="this.style.background='var(--panel2)';this.removeAttribute('src')">`
-    : `<div style="aspect-ratio:2.5/3.5;background:var(--panel2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;">No Image</div>`;
-  return `<div class="card-tile${owned ? ' owned' : ''}" id="tile-${key}" onclick='openModal(${cdata})'>
-      ${imgTag}
-      <div class="tile-check" onclick='event.stopPropagation();handleToggle(${cdata})'>${owned ? '✓' : ''}</div>
-      <div class="tile-info">
-        <div class="tile-name" title="${c.name || ''}">${c.name || '—'}${printBadge(c) ? `<span class="crow-print-badge">${printBadge(c)}</span>` : ''}</div>
-        <div class="tile-set" title="${c.set}">${c.set}</div>
-        <div class="tile-footer">
-          <div class="tile-price-row"><span class="tile-price">${c.price !== 'N/A' ? c.price : '—'}</span>${staleWarningIcon(c)}${seventyPercentBadgeHtml(c)}${changeBadge}</div>
-        </div>
-      </div>
-    </div>`;
+  for (const c of cards.slice(0, FLAT_CAP)) html += renderTileHtml(c);
+  el.innerHTML = html + `</div>` + capNote(cards.length) + `</div>`;
 }
 
 function renderGrid(cards, el) {
@@ -619,21 +613,18 @@ function renderGrid(cards, el) {
     const data = bySet[sid];
     html += `<div class="era-section">
       <div class="era-header">
-        <div class="era-title">${data.setName}</div>
+        <div class="era-title">${escapeHtml(data.setName)}</div>
         <div class="era-count">${data.cards.length} card${data.cards.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="card-grid">`;
-    for (const c of data.cards) {
-      html += renderTileHtml(c);
-    }
+    for (const c of data.cards) html += renderTileHtml(c);
     html += `</div></div>`;
   }
   el.innerHTML = html;
 }
 
-function handleToggle(c) {
-  const justAdded = toggleOwned(c);
-  const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
+function markOwned(c) {
+  const key = domKey(c);
   const owned = isOwned(c);
   const row = document.getElementById('row-' + key);
   if (row) {
@@ -647,6 +638,11 @@ function handleToggle(c) {
     const chk = tile.querySelector('.tile-check');
     if (chk) chk.textContent = owned ? '✓' : '';
   }
+}
+
+function handleToggle(c) {
+  const justAdded = toggleOwned(c);
+  markOwned(c);
   if (justAdded) {
     openModal(c);
     showPurchasePrompt();

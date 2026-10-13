@@ -141,6 +141,7 @@ async function mergeFirestoreToLocal(uid) {
       const data = snap.data();
       const remote = toPlainObject(data.owned ?? data.keys ?? []);
       localStorage.setItem(LOCAL_OWNED_KEY, JSON.stringify(remote));
+      if (window.invalidateOwnedCache) window.invalidateOwnedCache();
     } else {
       const local = toPlainObject(JSON.parse(localStorage.getItem(LOCAL_OWNED_KEY) || '{}'));
       if (Object.keys(local).length > 0) {
@@ -158,7 +159,9 @@ function startFirestoreListener(uid) {
       const data = snap.data();
       const remote = toPlainObject(data.owned ?? data.keys ?? []);
       localStorage.setItem(LOCAL_OWNED_KEY, JSON.stringify(remote));
+      if (window.invalidateOwnedCache) window.invalidateOwnedCache();
       if (typeof updateCollectionValue === 'function') updateCollectionValue();
+      if (typeof refreshOwnedMarks === 'function') refreshOwnedMarks();
     });
   } catch (e) {
     console.warn('[Firebase] listener attach failed', e);

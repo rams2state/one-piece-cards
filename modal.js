@@ -38,7 +38,7 @@ function openModal(c, updateList = true) {
   if (promptEl) promptEl.style.display = 'none';
   if (updateList) {
     _modalList = _setDetailOrder || getFiltered();
-    _modalIdx = _modalList.findIndex(x => x.cardId === c.cardId);
+    _modalIdx = _modalList.findIndex(x => cardKey(x) === cardKey(c));
     if (_modalIdx === -1) _modalIdx = 0;
     sessionStorage.setItem('binderScroll', window.scrollY);
     history.pushState({ modal: true }, '');
@@ -54,10 +54,11 @@ function openModal(c, updateList = true) {
   }
 
   const cardNumEl = document.getElementById('mCardNum');
-  if (cardNumEl) cardNumEl.textContent = c.cardId || '';
+  if (cardNumEl) cardNumEl.textContent = (c.cardId || '').replace(/_p\d+$/, '');
 
   document.getElementById('mMeta').innerHTML =
-    [c.set, c.setId].filter(Boolean).join(' <span class="meta-dot">·</span> ');
+    [c.set, c.setId, c.lang === 'jp' ? 'Japanese' : ''].filter(Boolean).map(escapeHtml)
+      .join(' <span class="meta-dot">·</span> ');
 
   // REMOVED 2026-09-06 per Jordan: "dont really care for this block" (the
   // Color/Type/Cost/Power/Life/Counter/Attribute stat-box grid). The
@@ -70,7 +71,7 @@ function openModal(c, updateList = true) {
   // Price with 7-day change
   const cv = priceVal(c.price);
   let priceHtml = c.price && c.price !== 'N/A' ? c.price : 'Price N/A';
-  const pv7 = getPriceNDaysAgo(c.cardId, 7);
+  const pv7 = getPriceNDaysAgo(c);
   if (!READ_ONLY_SHARE && cv >= 0 && pv7 !== null && pv7 > 0) {
     const delta = cv - pv7;
     const pct = (delta / pv7 * 100).toFixed(1);
@@ -81,6 +82,14 @@ function openModal(c, updateList = true) {
   }
   const staleBadge = stalePriceBadge(c);
   if (staleBadge) priceHtml += ' ' + staleBadge;
+  if (c.lang === 'jp') {
+    priceHtml += `<div class="modal-price-src">US market · PriceCharting ungraded (eBay sales)</div>`;
+    if (c.jpyUsd) {
+      const usd = priceVal(c.price);
+      const gap = usd > 0 ? `<span class="jp-gap${usd >= c.jpyUsd ? '' : ' jp-gap--neg'}">US ${usd >= c.jpyUsd ? '+' : '−'}${fmtUsd(Math.abs(usd - c.jpyUsd))} vs JP</span>` : '';
+      priceHtml += `<div class="modal-jp-market">JP market: ${fmtUsd(c.jpyUsd)} <span class="jp-yen">(¥${c.jpy.toLocaleString()} · Yuyu-tei)</span> ${gap}</div>`;
+    }
+  }
 
   if (!READ_ONLY_SHARE) {
     // REMOVED 2026-09-16 per Jordan: "just like the pokemon app, we need
@@ -101,7 +110,7 @@ function openModal(c, updateList = true) {
   const img = document.getElementById('mImg');
   const fallback = document.getElementById('mFallback');
   if (c.pic) {
-    img.src = c.pic;
+    img.src = c.picLarge || c.pic;
     img.style.display = '';
     fallback.style.display = 'none';
   } else {
@@ -110,7 +119,15 @@ function openModal(c, updateList = true) {
     fallback.style.display = 'block';
   }
 
-  document.getElementById('mBuy').href = buildTcgplayerUrl(c);
+  const mBuy = document.getElementById('mBuy');
+  mBuy.href = c.lang === 'jp' ? buildPriceChartingUrl(c) : buildTcgplayerUrl(c);
+  mBuy.textContent = c.lang === 'jp' ? 'PriceCharting →' : 'Find on TCGplayer →';
+  const mYY = document.getElementById('mBuyYuyu');
+  if (mYY) {
+    const yy = c.lang === 'jp' ? buildYuyuteiUrl(c) : '';
+    mYY.style.display = yy ? '' : 'none';
+    if (yy) mYY.href = yy;
+  }
   // CHANGED 2026-09-16 per Jordan: "replace the find on find on
   // pricecharting button with a find on ebay button that had the same
   // behavior as the psa10 button" -- same element/id, now a general eBay
@@ -125,7 +142,7 @@ function openModal(c, updateList = true) {
   ownBtn.classList.toggle('owned', owned);
 
   if (!READ_ONLY_SHARE) {
-    renderPriceChart(c.cardId || '');
+    renderPriceChart(c);
   }
 
   document.getElementById('modalBackdrop').classList.add('active');
@@ -140,19 +157,7 @@ function toggleFromModal() {
   const ownBtn = document.getElementById('mOwn');
   ownBtn.textContent = owned ? 'Owned' : '＋ Mark as Owned';
   ownBtn.classList.toggle('owned', owned);
-  const key = cardKey(c).replace(/[^a-z0-9]/gi, '_');
-  const row = document.getElementById('row-' + key);
-  if (row) {
-    row.classList.toggle('owned', owned);
-    const chk = row.querySelector('.crow-check');
-    if (chk) { chk.textContent = owned ? '✓' : ''; chk.classList.toggle('owned', owned); }
-  }
-  const tile = document.getElementById('tile-' + key);
-  if (tile) {
-    tile.classList.toggle('owned', owned);
-    const chk = tile.querySelector('.tile-check');
-    if (chk) chk.textContent = owned ? '✓' : '';
-  }
+  markOwned(c);
   if (justAdded) showPurchasePrompt();
 }
 
@@ -196,13 +201,49 @@ function closeModal(restoreScroll = true) {
 }
 
 // ─── PRICE HISTORY CHART ─────────────────────────────────────────────────────
-function renderPriceChart(cardId) {
+// CHANGED 2026-10-13: the history file and Chart.js (~200 KB) are only
+// downloaded the first time a card is opened, not on every page load.
+const _historyCache = {};
+function loadHistory(lang) {
+  if (!_historyCache[lang]) {
+    const v = (window.DATA_VERSION && window.DATA_VERSION[lang]) || '';
+    _historyCache[lang] = fetch(`data/history-${lang}.json?v=${v}`)
+      .then(r => (r.ok ? r.json() : {}))
+      .catch(() => ({}));
+  }
+  return _historyCache[lang];
+}
+let _chartJsPromise = null;
+function loadChartJs() {
+  if (window.Chart) return Promise.resolve();
+  if (!_chartJsPromise) {
+    _chartJsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+      s.onload = resolve;
+      s.onerror = () => { _chartJsPromise = null; reject(); };
+      document.head.appendChild(s);
+    });
+  }
+  return _chartJsPromise;
+}
+
+async function renderPriceChart(c) {
   const canvas = document.getElementById('priceChart');
   const emptyMsg = document.getElementById('mChartEmpty');
-
   if (_priceChart) { _priceChart.destroy(); _priceChart = null; }
+  canvas.style.display = 'none';
+  emptyMsg.style.display = '';
+  emptyMsg.textContent = 'Loading price history…';
 
-  const history = PRICE_HISTORY[cardId] || [];
+  const lang = c.lang || 'en';
+  const key = lang === 'jp' ? c.uid : c.cardId;
+  let all;
+  try { [all] = await Promise.all([loadHistory(lang), loadChartJs()]); }
+  catch (e) { emptyMsg.textContent = 'Price chart unavailable right now.'; return; }
+  if (_modalCard !== c) return; // user moved on while loading
+  emptyMsg.textContent = 'No history yet — check back once the collector has run for a few days.';
+  const history = (all && all[key]) || [];
 
   if (history.length < 2) {
     canvas.style.display = 'none';

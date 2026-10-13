@@ -16,7 +16,8 @@ function buildTcgplayerUrl(c) {
 // set + Parallel/Special tokens) minus the "PSA 10" keyword, since this
 // is a general search now, not graded-only.
 function buildEbayUrl(c) {
-  const parts = [c.name || '', c.set || ''];
+  const parts = [c.name || '', c.lang === 'jp' ? (c.cardId || '').replace(/_p\d+$/, '') : (c.set || '')];
+  if (c.lang === 'jp') parts.push('Japanese');
   if (c.isParallel) parts.push('Parallel');
   if (c.isSpecial) parts.push('Special');
   const q = parts.filter(Boolean).join(' ');
@@ -25,4 +26,17 @@ function buildEbayUrl(c) {
     LH_BIN: '1',
   });
   return `https://www.ebay.com/sch/i.html?${params.toString()}`;
+}
+
+// ADDED 2026-10-13: Japanese cards link to their PriceCharting page (where
+// the US price comes from) and their Yuyu-tei page (JP-market price).
+function buildPriceChartingUrl(c) {
+  if (c.pcPath) {
+    const [consoleUri, productUri] = c.pcPath.split('/');
+    return `https://www.pricecharting.com/game/${encodeURIComponent(consoleUri)}/${encodeURIComponent(productUri)}`;
+  }
+  return `https://www.pricecharting.com/search-products?q=${encodeURIComponent((c.rawName || c.name) + ' ' + (c.cardId || '').replace(/_p\d+$/, '') + ' japanese')}&type=prices`;
+}
+function buildYuyuteiUrl(c) {
+  return c.yyPath ? `https://yuyu-tei.jp/${c.yyPath}` : '';
 }
