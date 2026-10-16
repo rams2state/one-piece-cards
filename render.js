@@ -246,6 +246,10 @@ function printBadge(c) {
   const m = (c.cardId || '').match(/_(p|r)(\d+)$/i);
   if (!m) return '';
   const name = c.rawName || c.name || '';
+  if (c.src === 'pc') {
+    const tag = (name.match(/\(([^()]+)\)\s*$/) || [])[1] || 'Special';
+    return tag.length > 14 ? tag.slice(0, 13) + '…' : tag;
+  }
   if (/super alternate|super leader/i.test(name)) return 'Super Alt';
   if (/manga/i.test(name)) return 'Manga';
   if (/alternate art/i.test(name)) return 'Alt Art';

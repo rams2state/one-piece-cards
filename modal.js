@@ -82,6 +82,9 @@ function openModal(c, updateList = true) {
   }
   const staleBadge = stalePriceBadge(c);
   if (staleBadge) priceHtml += ' ' + staleBadge;
+  if (c.src === 'pc') {
+    priceHtml += `<div class="modal-price-src">Price from PriceCharting (eBay sales) — this print isn't in the TCGplayer data</div>`;
+  }
   if (c.lang === 'jp') {
     priceHtml += `<div class="modal-price-src">US market · PriceCharting ungraded (eBay sales)</div>`;
     if (c.jpyUsd) {
@@ -120,8 +123,9 @@ function openModal(c, updateList = true) {
   }
 
   const mBuy = document.getElementById('mBuy');
-  mBuy.href = c.lang === 'jp' ? buildPriceChartingUrl(c) : buildTcgplayerUrl(c);
-  mBuy.textContent = c.lang === 'jp' ? 'PriceCharting →' : 'Find on TCGplayer →';
+  const viaPc = c.lang === 'jp' || c.src === 'pc';
+  mBuy.href = viaPc ? buildPriceChartingUrl(c) : buildTcgplayerUrl(c);
+  mBuy.textContent = viaPc ? 'PriceCharting →' : 'Find on TCGplayer →';
   const mYY = document.getElementById('mBuyYuyu');
   if (mYY) {
     const yy = c.lang === 'jp' ? buildYuyuteiUrl(c) : '';
@@ -237,7 +241,7 @@ async function renderPriceChart(c) {
   emptyMsg.textContent = 'Loading price history…';
 
   const lang = c.lang || 'en';
-  const key = lang === 'jp' ? c.uid : c.cardId;
+  const key = c.uid || c.cardId;
   let all;
   try { [all] = await Promise.all([loadHistory(lang), loadChartJs()]); }
   catch (e) { emptyMsg.textContent = 'Price chart unavailable right now.'; return; }

@@ -51,9 +51,15 @@ function fmtPrice(v) { return v != null && v > 0 ? `$${v.toFixed(2)}` : 'N/A'; }
 
 function normalizeEn(r, setNames, imgBase) {
   const rawName = r.name || '';
+  // Gap-fill cards (r.src === 'pc', see en_gapfill.py) have a "PC-<id>"
+  // key plus a real card number in r.num used for sorting/display.
+  const isPc = r.src === 'pc';
   return {
     lang: 'en',
-    cardId: r.id,
+    uid: isPc ? r.id : undefined,
+    src: r.src || '',
+    pcPath: r.pc || '',
+    cardId: isPc && r.num ? r.num + '_p9' : r.id,
     name: stripNameMarkers(rawName),
     rawName,
     isSpecial: /\(SP\)/i.test(rawName),
@@ -144,6 +150,7 @@ window.addEventListener('storage', e => { if (e.key === OWNED_KEY) _ownedCache =
 
 function cardKey(c) {
   if (c.lang === 'jp') return 'JP-' + c.uid;
+  if (c.uid) return c.uid;            // English gap-fill card ("PC-...")
   return c.cardId || `${c.name}_${c.set}`;
 }
 function domKey(c) { return cardKey(c).replace(/[^a-z0-9]/gi, '_'); }
