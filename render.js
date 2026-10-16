@@ -254,6 +254,15 @@ function printBadge(c) {
   return 'Parallel';
 }
 
+// ADDED 2026-10-16: set code in front of the set name ("OP-17 · The
+// World's Strongest Warriors") on grid tiles, grid section headers and
+// flat-list rows, so you can tell which set a card is from at a glance.
+// DON!! and promo tiles already read clearly, so they keep just the name.
+function setLabel(setId, setName) {
+  if (!setId || setId === 'DON' || setId === 'OP-PR' || setId === setName) return setName || setId || '';
+  return `${setId} · ${setName}`;
+}
+
 // ─── SHARED ROW / TILE MARKUP ────────────────────────────────────────────────
 function thumbHtml(c) {
   return c.pic
@@ -283,7 +292,7 @@ function rowHtml(c, opts = {}) {
        <span class="crow-name">${escapeHtml(c.name || '—')}${badgeHtml(c)}</span>`
     : `<div style="flex:1;min-width:0;">
         <div class="crow-name">${escapeHtml(c.name || '—')}${badgeHtml(c)}</div>
-        <div class="crow-set">${escapeHtml(c.set)}</div>
+        <div class="crow-set">${escapeHtml(setLabel(c.setId, c.set))}</div>
       </div>`;
   return `<div class="card-row${owned ? ' owned' : ''}" id="row-${key}" data-key="${key}">
       ${opts.rank ? `<span class="trend-rank">${opts.rank}</span>` : ''}
@@ -310,7 +319,7 @@ function renderTileHtml(c) {
       <div class="tile-check" data-act="own">${owned ? '✓' : ''}</div>
       <div class="tile-info">
         <div class="tile-name" title="${escapeHtml(c.name || '')}">${escapeHtml(c.name || '—')}${badgeHtml(c)}</div>
-        <div class="tile-set" title="${escapeHtml(c.set)}">${escapeHtml(c.set)}</div>
+        <div class="tile-set" title="${escapeHtml(setLabel(c.setId, c.set))}">${escapeHtml(setLabel(c.setId, c.set))}</div>
         <div class="tile-footer">
           <div class="tile-price-row"><span class="tile-price">${priceText(c)}</span>${staleWarningIcon(c)}${seventyPercentBadgeHtml(c)}${priceChangeBadge(c)}</div>
           ${jpMarketLine(c, 'jp-market jp-market--tile')}
@@ -613,7 +622,7 @@ function renderGrid(cards, el) {
     const data = bySet[sid];
     html += `<div class="era-section">
       <div class="era-header">
-        <div class="era-title">${escapeHtml(data.setName)}</div>
+        <div class="era-title">${escapeHtml(setLabel(sid, data.setName))}</div>
         <div class="era-count">${data.cards.length} card${data.cards.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="card-grid">`;
