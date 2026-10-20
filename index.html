@@ -67,6 +67,7 @@ if ('serviceWorker' in navigator) {
     <button class="filter-toggle-btn" id="filterToggleBtn" onclick="toggleFilterDrawer()">⚙ Filters</button>
   </div>
   <select id="eraFilter"><option value="">All Colors</option></select>
+  <select id="printFilter" aria-label="Print type"><option value="">All Prints</option></select>
   <select id="rarityFilter"><option value="">All Rarities</option></select>
   <select id="sortBy">
     <option value="date-asc">Set Order</option>
@@ -88,6 +89,7 @@ if ('serviceWorker' in navigator) {
 <!-- Mobile filter drawer (cloned selects, synced via JS) -->
 <div class="filter-drawer" id="filterDrawer">
   <select id="eraFilterM"><option value="">All Colors</option></select>
+  <select id="printFilterM" aria-label="Print type"><option value="">All Prints</option></select>
   <select id="rarityFilterM"><option value="">All Rarities</option></select>
   <select id="sortByM">
     <option value="date-asc">Set Order</option>

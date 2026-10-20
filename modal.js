@@ -82,8 +82,10 @@ function openModal(c, updateList = true) {
   }
   const staleBadge = stalePriceBadge(c);
   if (staleBadge) priceHtml += ' ' + staleBadge;
-  if (c.src === 'pc') {
-    priceHtml += `<div class="modal-price-src">Price from PriceCharting (eBay sales) — this print isn't in the TCGplayer data</div>`;
+  if (c.lang !== 'jp') {
+    priceHtml += c.src === 'pc'
+      ? `<div class="modal-price-src">Price from PriceCharting (eBay sales) — TCGplayer doesn't list this print</div>`
+      : `<div class="modal-price-src">TCGplayer market price</div>`;
   }
   if (c.lang === 'jp') {
     priceHtml += `<div class="modal-price-src">US market · PriceCharting ungraded (eBay sales)</div>`;

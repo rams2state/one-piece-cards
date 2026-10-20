@@ -53,16 +53,18 @@ function normalizeEn(r, setNames, imgBase) {
   const rawName = r.name || '';
   // Gap-fill cards (r.src === 'pc', see en_gapfill.py) have a "PC-<id>"
   // key plus a real card number in r.num used for sorting/display.
-  const isPc = r.src === 'pc';
+  const isPc = r.src === 'pc' || r.src === 'tcg';   // added by tcg_source.py / en_gapfill.py
   return {
     lang: 'en',
     uid: isPc ? r.id : undefined,
     src: r.src || '',
     pcPath: r.pc || '',
+    tcgId: r.tcg || '',
     cardId: isPc && r.num ? r.num + '_p9' : r.id,
     name: stripNameMarkers(rawName),
     rawName,
-    isSpecial: /\(SP\)/i.test(rawName),
+    isSpecial: /\(SP\)/i.test(rawName) || r.print === 'sp',
+    print: r.print || (r.parallel ? 'alt' : 'base'),   // see site_data.print_type()
     isParallel: !!r.parallel,
     setId: r.setId,
     set: setNames[r.setId] || r.setId,
@@ -91,6 +93,7 @@ function normalizeJp(r, setNames, imgBase, fx) {
     name: rawName.replace(/\s*\[[^\]]+\]\s*$/, ''),
     rawName,
     variant: r.variant || '',
+    print: r.setId === 'OP-PR' ? 'promo' : ({ other: 'event', pandaman: 'alt' }[r.variant] || r.variant || 'base'),
     isSpecial: r.variant === 'sp',
     isParallel: !!r.variant && r.variant !== 'base' && r.variant !== 'don',
     setId: r.setId,
@@ -246,3 +249,15 @@ function formatDateDisplay(dateStr) {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
+
+// ─── PRINT TYPES (ADDED 2026-10-19) ──────────────────────────────────────────
+// One label per print type, shown as a pill on cards and used by the Print
+// filter. English types come from the collector (site_data.print_type);
+// Japanese ones from the PriceCharting print label.
+const PRINT_LABEL = {
+  base: 'Regular', alt: 'Alt Art', sp: 'SP', manga: 'Manga', superalt: 'Super Alt', tr: 'TR',
+  wanted: 'Wanted', foil: 'Foil', reprint: 'Reprint', gold: 'Gold', boxtopper: 'Box Topper',
+  promo: 'Promo', event: 'Event', don: 'DON!!',
+};
+const PRINT_ORDER = ['manga', 'superalt', 'sp', 'tr', 'gold', 'wanted', 'alt', 'event', 'promo',
+                     'boxtopper', 'foil', 'reprint', 'don', 'base'];

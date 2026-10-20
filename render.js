@@ -51,21 +51,22 @@ function populateFilters() {
     rarities.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(RARITY_DISPLAY[r] || r)}</option>`).join('');
   rarEl.value = rarities.includes(prevRar) ? prevRar : '';
 
-  // Colors only exist in the English data; the Japanese side uses this
-  // same dropdown as a "print type" filter instead.
-  const colorEl = document.getElementById('eraFilter'); // reused select — "colorFilter" role
-  if (isJP()) {
-    const order = ['base', 'alt', 'superalt', 'manga', 'sp', 'tr', 'pandaman', 'don', 'other'];
-    const label = { base: 'Regular print', alt: 'Alt Art', superalt: 'Super Alt Art', manga: 'Manga',
-                    sp: 'SP', tr: 'TR', pandaman: 'Pandaman', don: 'DON!!', other: 'Other' };
-    const present = new Set(ALL_CARDS.map(c => c.variant));
-    colorEl.innerHTML = '<option value="">All Prints</option>' +
-      order.filter(v => present.has(v)).map(v => `<option value="${v}">${label[v]}</option>`).join('');
-  } else {
-    const colors = [...new Set(ALL_CARDS.map(c => c.color).filter(Boolean))].sort();
-    colorEl.innerHTML = '<option value="">All Colors</option>' +
-      colors.map(cl => `<option value="${escapeHtml(cl)}">${escapeHtml(cl)}</option>`).join('');
-  }
+  // Colors exist only in the English data (hidden for Japanese).
+  const colorEl = document.getElementById('eraFilter');
+  const colors = [...new Set(ALL_CARDS.map(c => c.color).filter(Boolean))].sort();
+  colorEl.innerHTML = '<option value="">All Colors</option>' +
+    colors.map(cl => `<option value="${escapeHtml(cl)}">${escapeHtml(cl)}</option>`).join('');
+  colorEl.style.display = colors.length ? '' : 'none';
+  const colorM = document.getElementById('eraFilterM');
+  if (colorM) colorM.style.display = colors.length ? '' : 'none';
+
+  // Print type filter (SP, Manga, Alt Art, TR...) -- ADDED 2026-10-19.
+  const printEl = document.getElementById('printFilter');
+  const counts = {};
+  for (const c of ALL_CARDS) counts[c.print] = (counts[c.print] || 0) + 1;
+  printEl.innerHTML = '<option value="">All Prints</option>' +
+    PRINT_ORDER.filter(t => counts[t]).map(t => `<option value="${t}">${PRINT_LABEL[t]} (${counts[t]})</option>`).join('');
+  printEl.value = '';
   colorEl.value = '';
   syncMobileFilters();
 }
@@ -73,9 +74,10 @@ function populateFilters() {
 function isFiltersActive() {
   const search = document.getElementById('search').value;
   const color = document.getElementById('eraFilter').value;
+  const print = document.getElementById('printFilter').value;
   const rarity = document.getElementById('rarityFilter').value;
   const sort = document.getElementById('sortBy').value;
-  return search || color || rarity || sort !== 'date-asc' || showOwnedOnly || !!_trendMode;
+  return search || color || print || rarity || sort !== 'date-asc' || showOwnedOnly || !!_trendMode;
 }
 
 function updateResetBtn() {
@@ -99,9 +101,10 @@ function resetFilters() {
   document.getElementById('search').value = '';
   document.getElementById('searchWrap').classList.remove('has-text');
   document.getElementById('eraFilter').value = '';
+  document.getElementById('printFilter').value = '';
   document.getElementById('rarityFilter').value = '';
   document.getElementById('sortBy').value = 'date-asc';
-  ['eraFilterM', 'rarityFilterM', 'sortByM'].forEach(id => {
+  ['eraFilterM', 'printFilterM', 'rarityFilterM', 'sortByM'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = id === 'sortByM' ? 'date-asc' : '';
   });
@@ -128,14 +131,16 @@ const normalizeSearchText = s => (s || '').toLowerCase();
 
 function getFiltered() {
   const q = normalizeSearchText(document.getElementById('search').value.trim());
-  const colorOrPrint = document.getElementById('eraFilter').value;
+  const color = document.getElementById('eraFilter').value;
+  const print = document.getElementById('printFilter').value;
   const rarity = document.getElementById('rarityFilter').value;
   const sort = document.getElementById('sortBy').value;
   const owned = showOwnedOnly ? getOwnedMap() : null;
 
   let cards = ALL_CARDS.filter(c => {
     if (owned && !owned[cardKey(c)]) return false;
-    if (colorOrPrint && (isJP() ? c.variant : c.color) !== colorOrPrint) return false;
+    if (color && c.color !== color) return false;
+    if (print && c.print !== print) return false;
     if (rarity && c.rarity !== rarity) return false;
     if (q) {
       if (!c._hay) c._hay = normalizeSearchText(`${c.rawName || c.name} ${c.set} ${c.setId} ${c.rarity} ${c.cardType} ${c.cardId}`);
@@ -239,23 +244,7 @@ function cardNumSort(a, b) {
 
 // Short print-variant label for a row ("Alt Art", "Manga", ...).
 function printBadge(c) {
-  if (c.lang === 'jp') {
-    return { alt: 'Alt Art', superalt: 'Super Alt', manga: 'Manga', sp: 'SP', tr: 'TR',
-             pandaman: 'Pandaman', other: 'Special' }[c.variant] || '';
-  }
-  const m = (c.cardId || '').match(/_(p|r)(\d+)$/i);
-  if (!m) return '';
-  const name = c.rawName || c.name || '';
-  if (c.src === 'pc') {
-    const tag = (name.match(/\(([^()]+)\)\s*$/) || [])[1] || 'Special';
-    return tag.length > 14 ? tag.slice(0, 13) + '…' : tag;
-  }
-  if (/super alternate|super leader/i.test(name)) return 'Super Alt';
-  if (/manga/i.test(name)) return 'Manga';
-  if (/alternate art/i.test(name)) return 'Alt Art';
-  if (/reprint/i.test(name)) return 'Reprint';
-  if (c.isSpecial) return 'SP';
-  return 'Parallel';
+  return c.print && c.print !== 'base' ? (PRINT_LABEL[c.print] || '') : '';
 }
 
 // ADDED 2026-10-16: set code in front of the set name ("OP-17 · The
@@ -275,7 +264,14 @@ function thumbHtml(c) {
 }
 function badgeHtml(c) {
   const b = printBadge(c);
-  return b ? `<span class="crow-print-badge">${b}</span>` : '';
+  return b ? `<span class="crow-print-badge print-${c.print}">${b}</span>` : '';
+}
+// Rarity + print pills drawn over the card image in grid view.
+function tilePillsHtml(c) {
+  const r = c.rarity ? `<span class="tile-pill tile-pill--rarity" style="--pill:${rarityColor(c.rarity)}">${escapeHtml(c.rarity)}</span>` : '';
+  const b = printBadge(c);
+  const p = b ? `<span class="tile-pill print-${c.print}">${b}</span>` : '';
+  return r || p ? `<div class="tile-pills">${r}${p}</div>` : '';
 }
 function priceText(c) { return c.price !== 'N/A' ? c.price : '—'; }
 
@@ -320,9 +316,10 @@ function renderTileHtml(c) {
     : `<div style="aspect-ratio:2.5/3.5;background:var(--panel2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;">No Image</div>`;
   return `<div class="card-tile${owned ? ' owned' : ''}" id="tile-${key}" data-key="${key}">
       ${imgTag}
+      ${tilePillsHtml(c)}
       <div class="tile-check" data-act="own">${owned ? '✓' : ''}</div>
       <div class="tile-info">
-        <div class="tile-name" title="${escapeHtml(c.name || '')}">${escapeHtml(c.name || '—')}${badgeHtml(c)}</div>
+        <div class="tile-name" title="${escapeHtml(c.name || '')}">${escapeHtml(c.name || '—')}</div>
         <div class="tile-set" title="${escapeHtml(setLabel(c.setId, c.set))}">${escapeHtml(setLabel(c.setId, c.set))}</div>
         <div class="tile-footer">
           <div class="tile-price-row"><span class="tile-price">${priceText(c)}</span>${staleWarningIcon(c)}${seventyPercentBadgeHtml(c)}${priceChangeBadge(c)}</div>
@@ -441,6 +438,7 @@ function _doRender() {
     } else {
       const q = document.getElementById('search').value.trim();
       const hasFilter = !!q || !!document.getElementById('eraFilter').value ||
+        !!document.getElementById('printFilter').value ||
         !!document.getElementById('rarityFilter').value || showOwnedOnly;
       if (!hasFilter) {
         el.innerHTML = `<div class="empty"><div class="display">Search to explore</div><p>Type a card name, number or set — or apply a filter — to see results in grid view.</p></div>`;
@@ -685,6 +683,8 @@ function syncMobileFilters() {
   document.getElementById('eraFilterM').innerHTML = desktopColor ? desktopColor.innerHTML : '';
   const desktopRar = document.getElementById('rarityFilter');
   document.getElementById('rarityFilterM').innerHTML = desktopRar ? desktopRar.innerHTML : '';
+  const desktopPrint = document.getElementById('printFilter');
+  document.getElementById('printFilterM').innerHTML = desktopPrint ? desktopPrint.innerHTML : '';
 }
 
 function applyViewState(v) {

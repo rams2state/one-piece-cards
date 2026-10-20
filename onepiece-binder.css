@@ -943,3 +943,35 @@
     background:#4ade8014;border:1px solid #4ade8040;border-radius:6px;padding:1px 6px;margin-left:4px;
   }
   .jp-gap--neg{color:#f87171;background:#f8717114;border-color:#f8717140;}
+
+  /* ── ADDED 2026-10-19: rarity + print pills ───────────────────────────── */
+  .card-tile{position:relative;}
+  .tile-pills{
+    position:absolute;top:8px;left:8px;z-index:2;display:flex;gap:4px;flex-wrap:wrap;
+    max-width:calc(100% - 52px);pointer-events:none;
+  }
+  .tile-pill{
+    font-family:'Manrope',sans-serif;font-size:11px;font-weight:800;letter-spacing:.03em;line-height:1;
+    padding:4px 7px;border-radius:6px;color:#fff;background:#3a1c1fcc;
+    border:1px solid #ffffff33;box-shadow:0 1px 4px #0008;white-space:nowrap;
+    backdrop-filter:blur(2px);
+  }
+  .tile-pill--rarity{background:#0d0708d9;color:var(--pill);border-color:var(--pill);}
+  /* print colors (also used by the small badge next to names in lists) */
+  .print-sp{background:#c026d3 !important;color:#fff !important;border-color:#f0abfc !important;}
+  .print-manga{background:#111 !important;color:#fff !important;border-color:#fff !important;}
+  .print-superalt{background:linear-gradient(90deg,#b45309,#f59e0b) !important;color:#fff !important;border-color:#fcd34d !important;}
+  .print-gold{background:linear-gradient(90deg,#a16207,#eab308) !important;color:#1a1200 !important;border-color:#fde68a !important;}
+  .print-tr{background:#7c3aed !important;color:#fff !important;border-color:#c4b5fd !important;}
+  .print-alt{background:#2563eb !important;color:#fff !important;border-color:#93c5fd !important;}
+  .print-wanted{background:#92400e !important;color:#fef3c7 !important;border-color:#fbbf24 !important;}
+  .print-event,.print-promo{background:#047857 !important;color:#fff !important;border-color:#6ee7b7 !important;}
+  .print-boxtopper,.print-foil,.print-reprint{background:#475569 !important;color:#fff !important;border-color:#cbd5e1 !important;}
+  .print-don{background:#a16207 !important;color:#fff !important;border-color:#fde68a !important;}
+  /* keep the toolbar on one line with the extra Print dropdown */
+  @media (min-width:701px){
+    .toolbar select{flex:0 1 150px;min-width:0;width:auto;}
+    .toolbar .search-wrap{flex:1 1 200px;min-width:160px;}
+    .toolbar .reset-btn,.toolbar .vbtn,.toolbar .view-toggle{flex:0 0 auto;}
+  }
+  @media (min-width:1180px){ .toolbar{flex-wrap:nowrap;} }

@@ -88,12 +88,12 @@ document.getElementById('clearSearch').addEventListener('click', function() {
   document.getElementById('searchWrap').classList.remove('has-text');
   render();
 });
-['eraFilter', 'rarityFilter'].forEach(id =>
+['eraFilter', 'printFilter', 'rarityFilter'].forEach(id =>
   document.getElementById(id).addEventListener('change', render)
 );
 document.getElementById('sortBy').addEventListener('change', handleSortChange);
 
-[['eraFilter', 'eraFilterM'], ['rarityFilter', 'rarityFilterM'], ['sortBy', 'sortByM']].forEach(([desk, mob]) => {
+[['eraFilter', 'eraFilterM'], ['printFilter', 'printFilterM'], ['rarityFilter', 'rarityFilterM'], ['sortBy', 'sortByM']].forEach(([desk, mob]) => {
   document.getElementById(mob).addEventListener('change', function() {
     document.getElementById(desk).value = this.value;
     if (desk === 'sortBy') handleSortChange();

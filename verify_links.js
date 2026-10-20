@@ -5,6 +5,8 @@
 
 // TCGplayer: One Piece TCG has its own category on TCGplayer.
 function buildTcgplayerUrl(c) {
+  // ADDED 2026-10-19: direct product page when we know TCGplayer's id.
+  if (c.tcgId) return `https://www.tcgplayer.com/product/${encodeURIComponent(c.tcgId)}`;
   const q = encodeURIComponent(c.name || '');
   return `https://www.tcgplayer.com/search/one-piece-card-game/product?q=${q}&view=grid`;
 }
