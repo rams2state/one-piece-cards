@@ -44,6 +44,11 @@ if ('serviceWorker' in navigator) {
       <span class="app-version app-version-readonly" id="appVersionReadOnly"></span>
       <div id="readOnlyBanner" class="read-only-banner">👁 Viewing a shared collection (read-only)</div>
     </div>
+    <div class="mode-tabs" id="modeTabs" role="group" aria-label="Section">
+      <button type="button" class="mode-btn active" data-mode-btn="collection" aria-pressed="true">🗂 Collection</button>
+      <button type="button" class="mode-btn" data-mode-btn="play" aria-pressed="false">🃏 Play</button>
+      <button type="button" class="mode-btn" data-mode-btn="decks" aria-pressed="false">📦 Decks</button>
+    </div>
     <div class="lang-toggle" role="group" aria-label="Card language">
       <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="true">🇺🇸 English</button>
       <button type="button" class="lang-btn" data-lang-btn="jp" aria-pressed="false">🇯🇵 Japanese</button>
@@ -128,7 +133,51 @@ if ('serviceWorker' in navigator) {
   </div>
 
   <div id="cardView" style="display:none;"></div>
+
+  <!-- Play tab (play.js): every English card with game text -->
+  <section id="playView" hidden>
+    <div class="play-banner" id="playBanner" hidden></div>
+    <div class="play-filters" id="playFilters">
+      <div class="play-row">
+        <input id="pSearch" type="search" placeholder="Search name, number, type or card text (e.g. blocker, cross guild)…" autocomplete="off">
+        <button type="button" class="vbtn" id="pFiltersToggle">⚙ Filters</button>
+      </div>
+      <div class="play-row play-more-filters">
+        <div class="pcolors">
+          <button type="button" class="pcolor color-red" data-pcolor="Red">Red</button>
+          <button type="button" class="pcolor color-green" data-pcolor="Green">Green</button>
+          <button type="button" class="pcolor color-blue" data-pcolor="Blue">Blue</button>
+          <button type="button" class="pcolor color-purple" data-pcolor="Purple">Purple</button>
+          <button type="button" class="pcolor color-black" data-pcolor="Black">Black</button>
+          <button type="button" class="pcolor color-yellow" data-pcolor="Yellow">Yellow</button>
+        </div>
+        <select id="pCat" aria-label="Card type"><option value="">All types</option><option>Leader</option><option>Character</option><option>Event</option><option>Stage</option></select>
+        <select id="pCost" aria-label="Cost"><option value="">Any cost</option><option value="0">Cost 0</option><option value="1">Cost 1</option><option value="2">Cost 2</option><option value="3">Cost 3</option><option value="4">Cost 4</option><option value="5">Cost 5</option><option value="6">Cost 6</option><option value="7">Cost 7</option><option value="8">Cost 8</option><option value="9">Cost 9</option><option value="10">Cost 10+</option></select>
+        <select id="pCounter" aria-label="Counter"><option value="">Any counter</option><option value="0">No counter</option><option value="1000">+1000</option><option value="2000">+2000</option></select>
+        <select id="pSet" aria-label="Set"><option value="">All sets</option></select>
+        <select id="pSort" aria-label="Sort"><option value="num">Card number</option><option value="newest">Newest sets first</option><option value="cost">Cost</option><option value="power">Power</option><option value="price-asc">Price: low → high</option><option value="price-desc">Price: high → low</option><option value="name">Name</option></select>
+        <button type="button" class="ptoggle" data-ptoggle="legal">Standard legal</button>
+        <button type="button" class="ptoggle" data-ptoggle="trigger">Has Trigger</button>
+        <button type="button" class="ptoggle" data-ptoggle="have">I have it</button>
+        <button type="button" class="ptoggle" data-ptoggle="fits" hidden>Fits my Leader</button>
+        <button type="button" class="reset-btn" data-pact="reset">✕ Reset</button>
+      </div>
+    </div>
+    <div class="play-count" id="playCount"></div>
+    <div class="play-grid" id="playGrid"></div>
+    <button type="button" class="vbtn play-more" id="playMore" hidden>Show more cards</button>
+  </section>
+
+  <!-- Decks tab (play.js) -->
+  <section id="decksView" hidden><div id="decksBody"></div></section>
 </main>
+
+<div class="play-modal" id="playModal" role="dialog" aria-modal="true">
+  <div class="pm">
+    <button type="button" class="modal-close pm-close" aria-label="Close">&times;</button>
+    <div class="pm-body" id="pmBody"></div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -177,7 +226,7 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-<footer>One Piece TCG Rarity Binder · <span id="footerSrc">Data from optcgapi.com &amp; TCGplayer</span></footer>
+<footer>One Piece TCG Rarity Binder · Card text &amp; block icons from Bandai's official card list · <span id="footerSrc">Data from optcgapi.com &amp; TCGplayer</span></footer>
 
 <!-- Firebase SDK -->
 <script type="module" src="firebase.js"></script>
@@ -188,5 +237,6 @@ if ('serviceWorker' in navigator) {
 <script src="verify_links.js"></script>
 <script src="modal.js"></script>
 <script src="app.js"></script>
+<script src="play.js"></script>
 </body>
 </html>

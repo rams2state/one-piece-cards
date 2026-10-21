@@ -8,7 +8,7 @@
 // in the right place without editing this file. See site_data.py on the
 // collector side for the file format.
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 let ALL_CARDS = [];

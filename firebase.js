@@ -50,9 +50,11 @@ if (_firebaseAvailable) {
         if (user) {
           await mergeFirestoreToLocal(user.uid);
           startFirestoreListener(user.uid);
+          startPlaySync(user.uid);
           await loadExistingShareId(user.uid);
         } else {
           if (_firestoreUnsub) { _firestoreUnsub(); _firestoreUnsub = null; }
+          if (_playUnsub) { _playUnsub(); _playUnsub = null; }
           _currentShareId = null;
           updateShareBtnVisibility();
         }
@@ -201,6 +203,44 @@ window.addEventListener('owned-changed', e => {
   if (key && action) {
     pushOwnedDelta(key, action, meta);
   }
+});
+
+// ── Play tab: "I have" counts + decks (ADDED 2026-10-21) ─────────────────────
+// Kept in their own document (users/<uid>/data/play) so the shared
+// collection link never exposes decks. Newest copy wins (by "updated").
+let _playUnsub = null;
+let _playTimer = null;
+function playDocRef(uid) { return doc(db, 'users', uid, 'data', 'play'); }
+
+async function startPlaySync(uid) {
+  try {
+    const snap = await getDoc(playDocRef(uid));
+    const local = window.getLocalPlay ? window.getLocalPlay() : null;
+    const remote = snap.exists() ? snap.data() : null;
+    if (remote && (!local || (remote.updated || 0) >= (local.updated || 0))) {
+      if (window.applyRemotePlay) window.applyRemotePlay(remote);
+    } else if (local && (local.decks.length || Object.keys(local.have).length)) {
+      await setDoc(playDocRef(uid), { have: local.have, decks: local.decks, updated: local.updated || Date.now() });
+    }
+    if (_playUnsub) _playUnsub();
+    _playUnsub = onSnapshot(playDocRef(uid), s => {
+      if (!s.exists() || s.metadata.hasPendingWrites) return;
+      const r = s.data();
+      const l = window.getLocalPlay ? window.getLocalPlay() : null;
+      if (!l || (r.updated || 0) > (l.updated || 0)) window.applyRemotePlay && window.applyRemotePlay(r);
+    });
+  } catch (e) { console.warn('[Firebase] play sync failed', e); }
+}
+
+window.addEventListener('play-changed', e => {
+  if (!_currentUid || !_firebaseAvailable) return;
+  clearTimeout(_playTimer);
+  const uid = _currentUid;
+  _playTimer = setTimeout(async () => {
+    const d = e.detail;
+    try { await setDoc(playDocRef(uid), { have: d.have, decks: d.decks, updated: d.updated }); }
+    catch (err) { console.warn('[Firebase] play save FAILED', err); }
+  }, 1200);
 });
 
 // ── Auth button handler ─────────────────────────────────────────────────────
