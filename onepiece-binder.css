@@ -975,3 +975,4 @@
     .toolbar .reset-btn,.toolbar .vbtn,.toolbar .view-toggle{flex:0 0 auto;}
   }
   @media (min-width:1180px){ .toolbar{flex-wrap:nowrap;} }
+  .print-special{background:linear-gradient(90deg,#111,#a16207) !important;color:#fde68a !important;border-color:#eab308 !important;}

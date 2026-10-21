@@ -257,7 +257,7 @@ function escapeHtml(s) {
 const PRINT_LABEL = {
   base: 'Regular', alt: 'Alt Art', sp: 'SP', manga: 'Manga', superalt: 'Super Alt', tr: 'TR',
   wanted: 'Wanted', foil: 'Foil', reprint: 'Reprint', gold: 'Gold', boxtopper: 'Box Topper',
-  promo: 'Promo', event: 'Event', don: 'DON!!',
+  promo: 'Promo', event: 'Event', don: 'DON!!', special: 'Special',
 };
-const PRINT_ORDER = ['manga', 'superalt', 'sp', 'tr', 'gold', 'wanted', 'alt', 'event', 'promo',
+const PRINT_ORDER = ['manga', 'superalt', 'sp', 'tr', 'special', 'gold', 'wanted', 'alt', 'event', 'promo',
                      'boxtopper', 'foil', 'reprint', 'don', 'base'];
