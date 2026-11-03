@@ -8,7 +8,7 @@
 // in the right place without editing this file. See site_data.py on the
 // collector side for the file format.
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.3.0';
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 let ALL_CARDS = [];
@@ -18,6 +18,8 @@ let currentView = 'list';       // 'list' | 'grid'
 let showOwnedOnly = false;
 let DATA_META = {};             // { generated, fx, ... } from the loaded file
 const READ_ONLY_SHARE = !!(new URLSearchParams(window.location.search).get('share'));
+// A scanned vendor sticker (?buy=...) shows only that card -- see vendor.js.
+window.BUY_MODE = ['buy', 'b', 'cart', 'checkout'].some(k => new URLSearchParams(window.location.search).has(k));
 
 // ─── LANGUAGE (EN / JP) ──────────────────────────────────────────────────────
 const LANG_KEY = 'onepiece-binder-lang';

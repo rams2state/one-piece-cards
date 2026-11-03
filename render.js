@@ -43,12 +43,15 @@ function updateStats() {
 }
 
 function populateFilters() {
-  const rarities = [...new Set(ALL_CARDS.map(c => c.rarity).filter(Boolean))]
-    .sort((a, b) => rarityRank(a) - rarityRank(b));
+  // CHANGED 2026-11-02 (Jordan): one Promo entry instead of several, plus
+  // SP and TR entries so those cards are one pick away (see rarityBucket).
+  const rarCounts = {};
+  for (const c of ALL_CARDS) { const b = rarityBucket(c); if (b) rarCounts[b] = (rarCounts[b] || 0) + 1; }
+  const rarities = Object.keys(rarCounts).sort((a, b) => rarityRank(a) - rarityRank(b));
   const rarEl = document.getElementById('rarityFilter');
   const prevRar = rarEl.value;
   rarEl.innerHTML = '<option value="">All Rarities</option>' +
-    rarities.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(RARITY_DISPLAY[r] || r)}</option>`).join('');
+    rarities.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(RARITY_DISPLAY[r] || r)} (${rarCounts[r]})</option>`).join('');
   rarEl.value = rarities.includes(prevRar) ? prevRar : '';
 
   // Colors exist only in the English data (hidden for Japanese).
@@ -141,7 +144,7 @@ function getFiltered() {
     if (owned && !owned[cardKey(c)]) return false;
     if (color && c.color !== color) return false;
     if (print && c.print !== print) return false;
-    if (rarity && c.rarity !== rarity) return false;
+    if (rarity && rarityBucket(c) !== rarity) return false;
     if (q) {
       if (!c._hay) c._hay = normalizeSearchText(`${c.rawName || c.name} ${c.set} ${c.setId} ${c.rarity} ${c.cardType} ${c.cardId}`);
       if (!c._hay.includes(q)) return false;

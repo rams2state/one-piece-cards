@@ -11,6 +11,16 @@
 // above typical SR/L pricing, so it's ranked alongside SEC/SR rather than
 // down with the plain rarities.
 const RARITY_ORDER = ['SEC', 'DON!!', 'SR', 'SP', 'L', 'TR', 'R', 'UC', 'C', 'P', 'PR'];
+// Rarity dropdown bucket (ADDED 2026-11-02): SP and TR prints get their own
+// entries (their printed rarity is usually SR/SEC/L), and every promo
+// spelling (P, PR, Promo...) is one "Promo" entry.
+function rarityBucket(c) {
+  const r = (c.rarity || '').trim();
+  if (c.print === 'sp' || /^SP$/i.test(r)) return 'SP';
+  if (c.print === 'tr' || /^TR$/i.test(r)) return 'TR';
+  if (/^(P|PR|PROMO|PROMOTION)$/i.test(r)) return 'P';
+  return r;
+}
 function rarityRank(r) {
   const idx = RARITY_ORDER.indexOf(r);
   return idx === -1 ? 99 : idx;
@@ -19,7 +29,7 @@ function rarityRank(r) {
 const RARITY_DISPLAY = {
   'SEC': 'Secret Rare',
   'SR':  'Super Rare',
-  'SP':  'Special Card',
+  'SP':  'SP (Special)',
   'L':   'Leader',
   'TR':  'Treasure Rare',
   'R':   'Rare',

@@ -46,15 +46,19 @@ if (_firebaseAvailable) {
     try {
       onAuthStateChanged(auth, async user => {
         _currentUid = user ? user.uid : null;
+        window._fbSignedIn = !!user;
+        window.dispatchEvent(new Event('vendor-sync-status'));
         updateAuthUI(user);
         if (user) {
           await mergeFirestoreToLocal(user.uid);
           startFirestoreListener(user.uid);
           startPlaySync(user.uid);
+          startVendorSync(user.uid);
           await loadExistingShareId(user.uid);
         } else {
           if (_firestoreUnsub) { _firestoreUnsub(); _firestoreUnsub = null; }
           if (_playUnsub) { _playUnsub(); _playUnsub = null; }
+          if (_vendorUnsub) { _vendorUnsub(); _vendorUnsub = null; }
           _currentShareId = null;
           updateShareBtnVisibility();
         }
@@ -240,6 +244,58 @@ window.addEventListener('play-changed', e => {
     const d = e.detail;
     try { await setDoc(playDocRef(uid), { have: d.have, decks: d.decks, updated: d.updated }); }
     catch (err) { console.warn('[Firebase] play save FAILED', err); }
+  }, 1200);
+});
+
+// ── Vendor list (ADDED 2026-11-02): same pattern, users/<uid>/data/vendor ──
+let _vendorUnsub = null;
+let _vendorTimer = null;
+function vendorDocRef(uid) { return doc(db, 'users', uid, 'data', 'vendor'); }
+async function startVendorSync(uid) {
+  try {
+    const snap = await getDoc(vendorDocRef(uid));
+    const local = window.getLocalVendor ? window.getLocalVendor() : null;
+    const remote = snap.exists() ? snap.data() : null;
+    if (remote && (!local || (remote.updated || 0) >= (local.updated || 0))) {
+      if (window.applyRemoteVendor) window.applyRemoteVendor(remote);
+    } else if (local && (local.items.length || local.sales.length)) {
+      await setDoc(vendorDocRef(uid), { items: local.items, sales: local.sales, pubId: local.pubId, updated: local.updated || Date.now() });
+    }
+    publishVendor(uid);
+    if (_vendorUnsub) _vendorUnsub();
+    _vendorUnsub = onSnapshot(vendorDocRef(uid), s => {
+      if (!s.exists() || s.metadata.hasPendingWrites) return;
+      const r = s.data();
+      const l = window.getLocalVendor ? window.getLocalVendor() : null;
+      if (!l || (r.updated || 0) > (l.updated || 0)) window.applyRemoteVendor && window.applyRemoteVendor(r);
+    });
+  } catch (e) { console.warn('[Firebase] vendor sync failed', e); }
+}
+// Public copy for the sticker QR pages: shares/v_<pubId> holds only
+// item -> card, condition, your price, stock (readable by anyone, like a
+// share link; only you can write it -- same rule as shares).
+async function publishVendor(uid) {
+  if (!window.vendorPublicDoc) return;
+  const p = window.vendorPublicDoc();
+  try {
+    await setDoc(shareDocRef(p.id), { ownerUid: uid, ...p.data });
+    window._vendorPublishOk = true;
+  } catch (err) {
+    console.warn('[Firebase] vendor publish FAILED', err);
+    window._vendorPublishOk = false;
+  }
+  window.dispatchEvent(new Event('vendor-sync-status'));
+}
+
+window.addEventListener('vendor-changed', e => {
+  if (!_currentUid || !_firebaseAvailable) return;
+  clearTimeout(_vendorTimer);
+  const uid = _currentUid;
+  _vendorTimer = setTimeout(async () => {
+    const d = e.detail;
+    try { await setDoc(vendorDocRef(uid), { items: d.items, sales: d.sales, pubId: d.pubId, updated: d.updated }); }
+    catch (err) { console.warn('[Firebase] vendor save FAILED', err); }
+    publishVendor(uid);
   }, 1200);
 });
 

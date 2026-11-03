@@ -135,6 +135,8 @@ async function setMode(mode, opts = {}) {
   });
   document.getElementById('playView').hidden = mode !== 'play';
   document.getElementById('decksView').hidden = mode !== 'decks';
+  document.getElementById('vendorView').hidden = mode !== 'vendor';
+  if (mode === 'vendor') { enterVendor(); window.scrollTo({ top: 0, behavior: 'instant' }); return; }
   if (mode === 'collection') {
     PLAY.deckId = null; PLAY.pickLeader = false;
     if (LANG !== 'en' || !ALL_CARDS.length) showLang(LANG);
@@ -812,7 +814,10 @@ function initPlay() {
   const q = new URLSearchParams(location.search).get('tab');
   let start = q;
   if (!start) { try { start = localStorage.getItem(MODE_KEY); } catch (e) {} }
-  if ((start === 'play' || start === 'decks') && !READ_ONLY_SHARE) setMode(start, { force: true });
+  if (window.BUY_MODE) return;
+  // after every script (vendor.js too) has loaded
+  if (['play', 'decks', 'vendor'].includes(start) && !READ_ONLY_SHARE)
+    window.addEventListener('DOMContentLoaded', () => setMode(start, { force: true }));
 }
 
 initPlay();

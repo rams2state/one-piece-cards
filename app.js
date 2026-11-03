@@ -182,7 +182,8 @@ function setLang(lang) {
 document.querySelectorAll('[data-lang-btn]').forEach(b =>
   b.addEventListener('click', () => setLang(b.dataset.langBtn)));
 
-showLang(LANG);
+if (window.BUY_MODE) updateLangToggle();   // sticker page: vendor.js loads just that card
+else showLang(LANG);
 
 // ─── NAVIGATION: mouse button 4 (desktop back button) ────────────────────────
 document.addEventListener('mouseup', e => {

@@ -36,6 +36,8 @@ function openModal(c, updateList = true) {
   _modalCard = c;
   const promptEl = document.getElementById('mPurchasePrompt');
   if (promptEl) promptEl.style.display = 'none';
+  const sellEl = document.getElementById('mSellForm');
+  if (sellEl) sellEl.style.display = 'none';
   if (updateList) {
     _modalList = _setDetailOrder || getFiltered();
     _modalIdx = _modalList.findIndex(x => cardKey(x) === cardKey(c));
