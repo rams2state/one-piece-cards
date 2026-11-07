@@ -50,10 +50,6 @@ if ('serviceWorker' in navigator) {
       <button type="button" class="mode-btn" data-mode-btn="decks" aria-pressed="false">📦 Decks</button>
       <button type="button" class="mode-btn" data-mode-btn="vendor" aria-pressed="false">🏷 Vendor</button>
     </div>
-    <div class="lang-toggle" role="group" aria-label="Card language">
-      <button type="button" class="lang-btn" data-lang-btn="en" aria-pressed="true">🇺🇸 English</button>
-      <button type="button" class="lang-btn" data-lang-btn="jp" aria-pressed="false">🇯🇵 Japanese</button>
-    </div>
     <div class="stats-row" id="statsRow">
       <div class="stat" id="statCardsBox"><div class="n" id="statCards">—</div><div class="l">Total Cards</div></div>
       <div class="stat stat-owned" id="statOwnedBox" onclick="toggleOwnedFilter()" title="Click to show only owned cards">
@@ -215,7 +211,7 @@ if ('serviceWorker' in navigator) {
       <div class="modal-actions">
         <button class="modal-own" id="mOwn" onclick="toggleFromModal()">＋ Mark as Owned</button>
         <a class="modal-buy" id="mBuy" href="#" target="_blank" rel="noopener">Find on TCGplayer →</a>
-        <a class="modal-buy modal-buy--pricecharting" id="mBuyEbay" href="#" target="_blank" rel="noopener">Find on eBay →</a>
+        <a class="modal-buy modal-buy--pricecharting" id="mBuyEbay" href="#" target="_blank" rel="noopener">eBay PSA 10 →</a>
         <button type="button" class="modal-buy modal-sell" id="mSell" onclick="openSellFromModal()">🏷 Sell</button>
         <a class="modal-buy modal-buy--pricecharting" id="mBuyYuyu" href="#" target="_blank" rel="noopener" style="display:none;">Yuyu-tei (JP) →</a>
       </div>

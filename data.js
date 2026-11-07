@@ -8,7 +8,7 @@
 // in the right place without editing this file. See site_data.py on the
 // collector side for the file format.
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 let ALL_CARDS = [];
@@ -23,11 +23,9 @@ window.BUY_MODE = ['buy', 'b', 'cart', 'checkout'].some(k => new URLSearchParams
 
 // ─── LANGUAGE (EN / JP) ──────────────────────────────────────────────────────
 const LANG_KEY = 'onepiece-binder-lang';
-let LANG = (() => {
-  const q = new URLSearchParams(window.location.search).get('lang');
-  if (q === 'jp' || q === 'en') return q;
-  try { return localStorage.getItem(LANG_KEY) === 'jp' ? 'jp' : 'en'; } catch (e) { return 'en'; }
-})();
+// REMOVED 2026-11-06 per Jordan: Japanese cards (not on TCGplayer). The
+// app is English-only; the JP code paths below are left dormant.
+let LANG = 'en';
 function isJP() { return LANG === 'jp'; }
 
 document.getElementById('appVersion').textContent = 'v' + APP_VERSION;

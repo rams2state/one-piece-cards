@@ -556,8 +556,10 @@ function renderSetOverview(cards, el) {
     return html + `</div></div>`;
   }
 
-  el.innerHTML = renderSection(isJP() ? 'Japanese Sets' : 'Main Sets', mainSets) +
-                 renderSection('Starter Decks', starterSets);
+  // CHANGED 2026-11-06 (Jordan): one list in release order -- starter
+  // decks sit with the boosters released around them, DON!! last (the
+  // order comes from the data file, see site_data.ordered_sets).
+  el.innerHTML = renderSection('Sets & Decks', setOrder);
 }
 
 function openSetDetail(setId) {

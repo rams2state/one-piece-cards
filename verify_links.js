@@ -17,11 +17,14 @@ function buildTcgplayerUrl(c) {
 // app. Query shape reused from the old PSA-10-specific builder (name +
 // set + Parallel/Special tokens) minus the "PSA 10" keyword, since this
 // is a general search now, not graded-only.
+// CHANGED 2026-11-06 (Jordan): PSA 10 search -- name + card number +
+// the version (alt art / manga / SP / TR...) + "PSA 10".
 function buildEbayUrl(c) {
-  const parts = [c.name || '', c.lang === 'jp' ? (c.cardId || '').replace(/_p\d+$/, '') : (c.set || '')];
-  if (c.lang === 'jp') parts.push('Japanese');
-  if (c.isParallel) parts.push('Parallel');
-  if (c.isSpecial) parts.push('Special');
+  const num = (c.cardId || '').match(/((?:OP|EB|ST|PRB|P)\d{0,2}-\d{3})/i);
+  const parts = [c.name || '', num ? num[1].toUpperCase() : ''];
+  const ver = { alt: 'Alt Art', manga: 'Manga', sp: 'SP', tr: 'Treasure Rare', superalt: 'Alt Art', wanted: 'Wanted Poster', gold: 'Gold' }[c.print];
+  if (ver) parts.push(ver);
+  parts.push('PSA 10');
   const q = parts.filter(Boolean).join(' ');
   const params = new URLSearchParams({
     _nkw: q,

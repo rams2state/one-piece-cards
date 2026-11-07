@@ -326,7 +326,7 @@ function renderVendorResults() {
   box.innerHTML = hits.map(c => `<button type="button" class="vhit" data-vadd="${escapeHtml(cardKey(c))}">
       <img loading="lazy" src="${escapeHtml(c.pic)}" alt=""><span><b>${escapeHtml(c.rawName || c.name)}</b>
       <small>${escapeHtml((c.cardId || '').replace(/_p\d+$/, ''))} · ${escapeHtml(c.setId)}${c.lang === 'jp' ? ' · 🇯🇵' : ''} · ${escapeHtml(c.price)}</small></span></button>`).join('')
-    || (_cardCache.jp ? '<div class="decks-sub">No matches.</div>' : '<div class="decks-sub">No English matches. <button type="button" class="vbtn" data-vact="load-jp">Search Japanese too</button></div>');
+    || '<div class="decks-sub">No matches.</div>';
 }
 
 function recordSale(it, price, extra = {}) {
