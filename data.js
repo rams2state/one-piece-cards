@@ -255,7 +255,7 @@ function escapeHtml(s) {
 // filter. English types come from the collector (site_data.print_type);
 // Japanese ones from the PriceCharting print label.
 const PRINT_LABEL = {
-  base: 'Regular', alt: 'Alt Art', sp: 'SP', manga: 'Manga', superalt: 'Super Alt', tr: 'TR',
+  base: 'Regular', alt: 'AA', sp: 'SP', manga: 'Manga', superalt: 'Super Alt', tr: 'TR',
   wanted: 'Wanted', foil: 'Foil', reprint: 'Reprint', gold: 'Gold', boxtopper: 'Box Topper',
   promo: 'Promo', event: 'Event', don: 'DON!!', special: 'Special',
 };
