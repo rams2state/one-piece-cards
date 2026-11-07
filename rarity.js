@@ -18,7 +18,7 @@ function rarityBucket(c) {
   const r = (c.rarity || '').trim();
   if (c.print === 'sp' || /^SP$/i.test(r)) return 'SP';
   if (c.print === 'tr' || /^TR$/i.test(r)) return 'TR';
-  if (/^(P|PR|PROMO|PROMOTION)$/i.test(r)) return 'P';
+  if (/^(P|PR|PROMO|PROMOTION)$/i.test(r) || c.setId === 'OP-PR') return 'P';   // all of Promotion Cards
   return r;
 }
 function rarityRank(r) {

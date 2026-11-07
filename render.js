@@ -265,15 +265,23 @@ function thumbHtml(c) {
     ? `<img class="crow-thumb" src="${escapeHtml(c.pic)}" alt="" loading="lazy" decoding="async" referrerpolicy="origin" onerror="this.style.display='none'">`
     : `<div class="crow-thumb-empty">?</div>`;
 }
+// ADDED 2026-11-06 (Jordan): every card in Promotion Cards gets a "Promo"
+// pill next to its real rarity (event versions of set cards keep their
+// original rarity, e.g. a Regionals ST01-015 is still a C).
+function promoPillNeeded(c) {
+  return c.setId === 'OP-PR' && c.print !== 'promo' && !/^(P|PR)$/i.test(c.rarity || '');
+}
 function badgeHtml(c) {
   const b = printBadge(c);
-  return b ? `<span class="crow-print-badge print-${c.print}">${b}</span>` : '';
+  const promo = promoPillNeeded(c) ? '<span class="crow-print-badge print-promo">Promo</span>' : '';
+  return (b ? `<span class="crow-print-badge print-${c.print}">${b}</span>` : '') + promo;
 }
 // Rarity + print pills drawn over the card image in grid view.
 function tilePillsHtml(c) {
   const r = c.rarity ? `<span class="tile-pill tile-pill--rarity" style="--pill:${rarityColor(c.rarity)}">${escapeHtml(c.rarity)}</span>` : '';
   const b = printBadge(c);
-  const p = b ? `<span class="tile-pill print-${c.print}">${b}</span>` : '';
+  const p = (b ? `<span class="tile-pill print-${c.print}">${b}</span>` : '') +
+            (promoPillNeeded(c) ? '<span class="tile-pill print-promo">Promo</span>' : '');
   return r || p ? `<div class="tile-pills">${r}${p}</div>` : '';
 }
 function priceText(c) { return c.price !== 'N/A' ? c.price : '—'; }
