@@ -213,7 +213,7 @@ function playFiltered() {
   });
   const by = {
     num: (a, b) => a.num.localeCompare(b.num),
-    newest: (a, b) => (b.num.slice(0, 4) === a.num.slice(0, 4) ? a.num.localeCompare(b.num) : b.num.localeCompare(a.num)),
+    newest: (a, b) => (setRankOfNum(b.num) - setRankOfNum(a.num)) || a.num.localeCompare(b.num),
     cost: (a, b) => ((a.cost ?? a.life ?? 99) - (b.cost ?? b.life ?? 99)) || a.num.localeCompare(b.num),
     power: (a, b) => ((b.power || 0) - (a.power || 0)) || a.num.localeCompare(b.num),
     'price-asc': (a, b) => ((a.price ?? 1e9) - (b.price ?? 1e9)),
@@ -222,6 +222,26 @@ function playFiltered() {
   }[f.sort] || ((a, b) => a.num.localeCompare(b.num));
   list.sort(by);
   return list;
+}
+
+// FIXED 2026-11-08: "Newest sets first" used alphabetical card-number
+// prefixes (so ST decks always came out on top). Now uses the release
+// order from the collection data (OP17 > ST-31 > OP16 ...); promo P-
+// numbers sort last.
+let _numRank = null;
+function setRankOfNum(num) {
+  if (!_numRank) {
+    _numRank = {};
+    const order = (typeof _cardCache !== 'undefined' && _cardCache.en && _cardCache.en.setOrder) || SET_ORDER || [];
+    order.forEach((sid, i) => {
+      for (const part of sid.split(/(?<=\d)-(?=[A-Z])/)) {     // "OP14-EB04" -> OP14, EB04
+        const k = part.replace('-', '');
+        if (!(k in _numRank)) _numRank[k] = i + 1;
+      }
+    });
+  }
+  const pre = (num || '').split('-')[0];
+  return _numRank[pre] || 0;
 }
 
 function readPlayFilters() {

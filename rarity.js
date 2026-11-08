@@ -10,12 +10,13 @@
 // hundreds of dollars (a "(Gold)" print was confirmed at $722.82) — well
 // above typical SR/L pricing, so it's ranked alongside SEC/SR rather than
 // down with the plain rarities.
-const RARITY_ORDER = ['SEC', 'DON!!', 'SR', 'SP', 'L', 'TR', 'R', 'UC', 'C', 'P', 'PR'];
+const RARITY_ORDER = ['MANGA', 'SEC', 'DON!!', 'SR', 'SP', 'L', 'TR', 'R', 'UC', 'C', 'P', 'PR'];
 // Rarity dropdown bucket (ADDED 2026-11-02): SP and TR prints get their own
 // entries (their printed rarity is usually SR/SEC/L), and every promo
 // spelling (P, PR, Promo...) is one "Promo" entry.
 function rarityBucket(c) {
   const r = (c.rarity || '').trim();
+  if (c.print === 'manga') return 'MANGA';     // ADDED 2026-11-08: its own entry
   if (c.print === 'sp' || /^SP$/i.test(r)) return 'SP';
   if (c.print === 'tr' || /^TR$/i.test(r)) return 'TR';
   if (/^(P|PR|PROMO|PROMOTION)$/i.test(r) || c.setId === 'OP-PR') return 'P';   // all of Promotion Cards
@@ -38,6 +39,7 @@ const RARITY_DISPLAY = {
   'P':   'Promo',
   'PR':  'Promo',
   'DON!!': 'DON!! Card',
+  'MANGA': 'Manga Rare',
 };
 
 const RARITY_COLOR = {

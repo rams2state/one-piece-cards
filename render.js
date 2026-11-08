@@ -516,7 +516,9 @@ function buildSetGroups(cards) {
     if (!bySet[sid]) { bySet[sid] = { setName: c.set, cards: [] }; setOrder.push(sid); }
     bySet[sid].cards.push(c);
   }
-  setOrder.sort((a, b) => setSortIndex(a) - setSortIndex(b));
+  // FIXED 2026-11-08: "Set Order (Reversed)" now flips the set tiles too (newest first)
+  const rev = (document.getElementById('sortBy') || {}).value === 'date-desc';
+  setOrder.sort((a, b) => rev ? setSortIndex(b) - setSortIndex(a) : setSortIndex(a) - setSortIndex(b));
   return { bySet, setOrder };
 }
 
