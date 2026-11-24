@@ -1281,3 +1281,6 @@ body.buy-mode main{padding-bottom:110px;}
   .buy-name{font-size:28px;}
   .buy-price{font-size:46px;}
 }
+
+/* 2026-11-24: promos inside sets can show a full card number (P-061, ST18-004) */
+.crow-num{width:auto !important;min-width:32px;max-width:72px;overflow:hidden;text-overflow:ellipsis;}

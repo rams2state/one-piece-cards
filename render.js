@@ -11,6 +11,7 @@
 // ─── LOAD DATA ───────────────────────────────────────────────────────────────
 function loadCards(cards) {
   ALL_CARDS = cards.filter(c => c.setId || c.name);
+  for (const k of Object.keys(_setNameById)) delete _setNameById[k];   // rebuilt for the new data
   CARD_BY_KEY = new Map(ALL_CARDS.map(c => [domKey(c), c]));
   updateStats();
   populateFilters();
@@ -152,16 +153,18 @@ function getFiltered() {
     return true;
   });
 
-  const setGroupKey = c => c.setId || '';
+  const setGroupKey = c => groupSet(c) || '';
   cards.sort((a, b) => {
     if (sort === 'date-asc') {
-      return setSortIndex(a.setId) - setSortIndex(b.setId)
+      return setSortIndex(groupSet(a)) - setSortIndex(groupSet(b))
         || setGroupKey(a).localeCompare(setGroupKey(b))
+        || (isPromoCard(a) - isPromoCard(b))
         || cardNumSort(a, b);
     }
     if (sort === 'date-desc') {
-      return setSortIndex(b.setId) - setSortIndex(a.setId)
+      return setSortIndex(groupSet(b)) - setSortIndex(groupSet(a))
         || setGroupKey(b).localeCompare(setGroupKey(a))
+        || (isPromoCard(a) - isPromoCard(b))
         || cardNumSort(b, a);
     }
     if (sort === 'price-desc') return priceVal(b.price) - priceVal(a.price);
@@ -289,6 +292,14 @@ function priceText(c) { return c.price !== 'N/A' ? c.price : '—'; }
 // "#022" for a card from the set being viewed; the full number for a
 // reprint from another set (e.g. an EB04 SP inside a Japanese OP-17 list).
 function shortNum(c) {
+  // CHANGED 2026-11-24: promos now sit inside sets -- "#061" only when the
+  // number is from the set on screen, else the full number (P-061, OP05-091).
+  const m = (c.cardId || '').match(/((?:OP|EB|ST|PRB|P)\d{0,2})-(\d{3})/i);
+  if (m && c.lang !== 'jp') {
+    const pre = m[1].toUpperCase();
+    if (pre === 'P') return 'P-' + m[2];
+    return groupSet(c).replace('-', '').toUpperCase().includes(pre) ? '#' + m[2] : pre + '-' + m[2];
+  }
   const num = (c.cardId || '').replace(/_(p|r)\d+$/i, '');
   if (c.lang === 'jp' && !num.startsWith((c.setId || '').replace('-', ''))) return num;
   return num.replace(/^[A-Z0-9]+-/, '#');
@@ -444,7 +455,7 @@ function _doRender() {
     _setDetailOrder = null;
     _lastRenderedSet = null;
     if (_activeSet) {
-      const gridCards = cards.filter(c => c.setId === _activeSet.setId);
+      const gridCards = cards.filter(c => groupSet(c) === _activeSet.setId);
       renderGrid(gridCards.length > 0 ? gridCards : cards, el);
     } else {
       const q = document.getElementById('search').value.trim();
@@ -468,7 +479,7 @@ function _doRender() {
     return;
   }
   if (_activeSet) {
-    const setCards = cards.filter(c => c.setId === _activeSet.setId);
+    const setCards = cards.filter(c => groupSet(c) === _activeSet.setId);
     if (setCards.length > 0) {
       const setKey = LANG + ':' + _activeSet.setId;
       if (_lastRenderedSet === setKey) {
@@ -508,13 +519,23 @@ function refreshOwnedMarks() {
 }
 
 // ─── SET GROUPING ────────────────────────────────────────────────────────────
+// ADDED 2026-11-24 (Jordan): promos live at the end of the set they belong
+// to (site_data.promo_homes) instead of one Promotion Cards tile.
+function isPromoCard(c) { return c.setId === 'OP-PR' ? 1 : 0; }
+function groupSet(c) { return c.setId === 'OP-PR' && c.home ? c.home : c.setId; }
+const _setNameById = {};
 function buildSetGroups(cards) {
   const bySet = {};
   const setOrder = [];
+  if (!_setNameById._built) {
+    for (const c of ALL_CARDS) if (c.setId && !_setNameById[c.setId]) _setNameById[c.setId] = c.set;
+    _setNameById._built = true;
+  }
   for (const c of cards) {
-    const sid = c.setId || 'Unknown';
-    if (!bySet[sid]) { bySet[sid] = { setName: c.set, cards: [] }; setOrder.push(sid); }
+    const sid = groupSet(c) || 'Unknown';
+    if (!bySet[sid]) { bySet[sid] = { setName: _setNameById[sid] || c.set, cards: [], promos: 0 }; setOrder.push(sid); }
     bySet[sid].cards.push(c);
+    if (isPromoCard(c) && sid !== 'OP-PR') bySet[sid].promos++;
   }
   // FIXED 2026-11-08: "Set Order (Reversed)" now flips the set tiles too (newest first)
   const rev = (document.getElementById('sortBy') || {}).value === 'date-desc';
@@ -559,7 +580,7 @@ function renderSetOverview(cards, el) {
         <div class="set-ov-name-row">
           <div class="set-ov-name">${escapeHtml(data.setName)}</div>
         </div>
-        <div class="set-ov-total">${setTotal} card${setTotal !== 1 ? 's' : ''}</div>
+        <div class="set-ov-total">${[setTotal - data.promos ? `${setTotal - data.promos} card${setTotal - data.promos !== 1 ? 's' : ''}` : '', data.promos ? `${data.promos} promo${data.promos !== 1 ? 's' : ''}` : ''].filter(Boolean).join(' + ')}</div>
         <div class="set-ov-pills">${rarityPillsForCards(data.cards)}</div>
       </div>`;
     }
@@ -583,9 +604,11 @@ function openSetDetail(setId) {
 
 function renderSetDetail(cards, el) {
   const setId = _activeSet.setId;
-  const setName = cards[0]?.set || setId;
+  const setName = _setNameById[setId] || cards[0]?.set || setId;
   const byRarity = {};
+  const promos = setId === 'OP-PR' ? [] : cards.filter(c => isPromoCard(c));
   for (const c of cards) {
+    if (setId !== 'OP-PR' && isPromoCard(c)) continue;
     const r = c.rarity || 'Unknown';
     (byRarity[r] = byRarity[r] || []).push(c);
   }
@@ -594,7 +617,7 @@ function renderSetDetail(cards, el) {
   let html = `<div class="set-detail-header">
     <button class="set-detail-back" onclick="history.back()">← All Sets</button>
     <div class="set-detail-info">
-      <div class="set-detail-era">${escapeHtml(setId)} · ${cards.length} cards</div>
+      <div class="set-detail-era">${escapeHtml(setId)} · ${cards.length - promos.length} cards${promos.length ? ` + ${promos.length} promos` : ''}</div>
       <div class="set-detail-name-row">
         <div class="set-detail-name">${escapeHtml(setName)}</div>
       </div>
@@ -612,6 +635,19 @@ function renderSetDetail(cards, el) {
       </div>
       <div class="detail-card-grid">`;
     for (const c of rarCards) {
+      onScreenOrder.push(c);
+      html += rowHtml(c, { numCol: true, showChange: true });
+    }
+    html += `</div></div>`;
+  }
+  if (promos.length) {
+    html += `<div class="rarity-group rarity-group--promos">
+      <div class="rarity-group-header">
+        <span class="rarity-group-label" style="color:#6ee7b7;">Promos</span>
+        <span class="rarity-group-count">(${promos.length})</span>
+      </div>
+      <div class="detail-card-grid">`;
+    for (const c of [...promos].sort((a, b) => rarityRank(rarityBucket(a)) - rarityRank(rarityBucket(b)) || cardNumSort(a, b))) {
       onScreenOrder.push(c);
       html += rowHtml(c, { numCol: true, showChange: true });
     }

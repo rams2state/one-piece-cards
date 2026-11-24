@@ -8,7 +8,7 @@
 // in the right place without editing this file. See site_data.py on the
 // collector side for the file format.
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 
 // ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 let ALL_CARDS = [];
@@ -76,6 +76,7 @@ function normalizeEn(r, setNames, imgBase) {
     priceVal: r.price || 0,
     p7: r.p7,
     lastPriced: r.lastPriced || '',
+    home: r.home || '',      // promos: the set they're shown under (2026-11-24)
   };
 }
 
